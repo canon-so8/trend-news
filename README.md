@@ -1,2 +1,2 @@
 
-DSに必要なスキルセットをまとめたニュースセット　daily_news/paper
+DSに必要なスキルセットをまとめたニュースセット　daily_news/paper 非定期更新
