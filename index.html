@@ -1,0 +1,60 @@
+---
+layout: null
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color: #222;
+      padding: 1.5rem 2rem;
+      max-width: 860px;
+    }
+    ul { list-style: none; }
+    li {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .date {
+      color: #999;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      min-width: 5.5rem;
+    }
+    a {
+      color: #1a6bbf;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+    a:hover { text-decoration: underline; }
+    .cat {
+      font-size: 0.7rem;
+      color: #888;
+      background: #f2f2f2;
+      padding: 1px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <ul>
+    {% for post in site.posts %}
+    <li>
+      <span class="date">{{ post.date | date: "%Y-%m-%d" }}</span>
+      {% for cat in post.categories %}<span class="cat">{{ cat }}</span> {% endfor %}
+      <a href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
