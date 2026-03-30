@@ -10,5 +10,7 @@ plugins:
 
 permalink: /:categories/:year/:month/:day/:title/
 
+future: true
+
 minima:
   skin: dark
