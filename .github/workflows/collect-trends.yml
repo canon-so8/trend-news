@@ -5,9 +5,6 @@ on:
     - cron: "0 3 * * 1-5"  # 平日 12:00 JST（※祝日は除外不可、土日のみ除外）
   workflow_dispatch:  # 手動実行も可
 
-# TODO: Slack通知を有効にする場合は SLACK_BOT_TOKEN を GitHub Secrets に登録して
-#       下部のコメントアウトを外す
-
 permissions:
   contents: write
 
@@ -23,16 +20,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install requests google-genai
+        run: pip install requests
 
       - name: Collect HF Papers
-        env:
-          GEMINI_API_TOKEN: ${{ secrets.GEMINI_API_TOKEN }}
         run: python scripts/collect_hf_papers.py
 
       - name: Collect Daily News
-        env:
-          GEMINI_API_TOKEN: ${{ secrets.GEMINI_API_TOKEN }}
         run: python scripts/collect_daily_news.py
 
       - name: Commit and push
@@ -67,6 +60,19 @@ jobs:
               )
               print(json.loads(urllib.request.urlopen(req).read()).get("ok"))
 
+          def wait_for_url(url, label):
+              for i in range(30):
+                  try:
+                      if urllib.request.urlopen(url).getcode() == 200:
+                          print(f'{label} ビルド完了確認（{(i+1)*10}秒）')
+                          return True
+                  except:
+                      pass
+                  print(f'{label} ビルド待機中... ({(i+1)*10}秒経過)')
+                  time.sleep(10)
+              print(f'{label} タイムアウト。そのまま送信します。')
+              return False
+
           now = datetime.now(timezone(timedelta(hours=9)))
           date_str = now.strftime("%Y-%m-%d")
 
@@ -74,8 +80,9 @@ jobs:
           hf_url    = Path("/tmp/hf_url.txt").read_text().strip()    if Path("/tmp/hf_url.txt").exists()    else ""
 
           if daily_url:
+              wait_for_url(daily_url, "ニュース")
               post(f"<{daily_url}|{date_str}のニュース>")
-          time.sleep(1)
           if hf_url:
+              wait_for_url(hf_url, "トレンド論文")
               post(f"<{hf_url}|{date_str}のトレンド論文>")
           EOF

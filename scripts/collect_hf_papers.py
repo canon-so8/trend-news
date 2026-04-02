@@ -53,6 +53,7 @@ CSS = """<style>
 .paper:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 details summary { cursor: pointer; font-size: 0.78rem; color: #888; margin-top: 4px; }
 details p { font-size: 0.82rem; margin: 4px 0 0 12px; color: #555; }
+details p.reason { font-size: 0.8rem; color: #b45309; margin-top: 6px; }
 details p.abstract { font-size: 0.78rem; color: #999; margin-top: 6px; }
 </style>"""
 
@@ -134,48 +135,20 @@ def fetch_papers(date_str: str) -> list[dict]:
     return []
 
 
-def gemini_summarize_papers(papers: list[dict], api_key: str) -> dict[int, str]:
-    """HF論文のアブストを日本語で要約。10件ずつバッチ処理。{index: summary_ja} を返す"""
-    try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
-    except ImportError:
-        print("  google-genai未インストール。スキップ。", file=sys.stderr)
-        return {}
-
-    results: dict[int, str] = {}
-    batch_size = 10
-    for start in range(0, len(papers), batch_size):
-        batch = papers[start:start + batch_size]
-        batch_json = json.dumps(
-            [{"id": start + i, "title": p["title"], "abstract": p["summary"][:300]}
-             for i, p in enumerate(batch)],
-            ensure_ascii=False,
-        )
-        prompt = f"""あなたはAI/ML論文の日本語解説者です。
-以下の論文を**必ず日本語**で、各論文2〜3文で要約してください。
-「何を提案しているか → どんな手法か → 何が得られたか」の順で書いてください。
-英語で回答しないでください。
-
-JSONのみ返してください:
-[{{"id": {start}, "summary_ja": "日本語の要約"}}, ...]
-
-論文:
-{batch_json}"""
-        try:
-            resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-            text = resp.text.strip()
-            m = re.search(r'\[.*\]', text, re.DOTALL)
-            if m:
-                text = m.group()
-            for item in json.loads(text):
-                if item.get("summary_ja"):
-                    results[item["id"]] = item["summary_ja"]
-        except Exception as e:
-            print(f"  Gemini 論文要約エラー (batch {start}): {e}", file=sys.stderr)
-        if start + batch_size < len(papers):
-            time.sleep(1)
-    return results
+def attention_reason(upvotes: int, github_stars: int) -> str:
+    """アップボート数・スター数から注目理由テキストを生成"""
+    parts = []
+    if upvotes >= 50:
+        parts.append(f"HFコミュニティで▲{upvotes}の高評価を獲得した注目論文")
+    elif upvotes >= 20:
+        parts.append(f"HFで▲{upvotes}upvotesを獲得し注目を集めている")
+    elif upvotes > 0:
+        parts.append(f"HF Daily Papersに掲載（▲{upvotes} upvotes）")
+    if github_stars >= 100:
+        parts.append(f"実装コードが★{github_stars}スターと高人気")
+    elif github_stars >= 10:
+        parts.append(f"GitHub実装あり（★{github_stars} stars）")
+    return "。".join(parts) + "。" if parts else ""
 
 
 def main():
@@ -223,30 +196,14 @@ def main():
 
     print(f"フィルタ後: {len(filtered)} 件")
 
-    # タグ付け
+    # タグ付け + Google Translateでアブスト翻訳
     for p in filtered:
         p["tags"] = assign_tags(p)
-        p["summary_ja"] = ""
 
-    # Gemini 日本語要約
-    gemini_key = os.environ.get("GEMINI_API_TOKEN", "")
-    if gemini_key:
-        print(f"  Gemini 論文要約中... ({len(filtered)}件)")
-        summary_map = gemini_summarize_papers(filtered, gemini_key)
-        for i, p in enumerate(filtered):
-            if i in summary_map:
-                p["summary_ja"] = summary_map[i]
-        print(f"  Gemini 論文要約完了 ({len(summary_map)}件)")
-    else:
-        print("  GEMINI_API_TOKEN未設定。Google Translateでアブスト翻訳。")
-
-    # Gemini要約がない論文はGoogle Translateで補完
-    need_translate = [p for p in filtered if not p["summary_ja"]]
-    if need_translate:
-        print(f"  Google Translate フォールバック翻訳中... ({len(need_translate)}件)")
-        for p in need_translate:
-            p["summary_ja"] = translate_ja(p["summary"])
-            time.sleep(0.2)
+    print(f"  Google Translateでアブスト翻訳中... ({len(filtered)}件)")
+    for p in filtered:
+        p["summary_ja"] = translate_ja(p["summary"])
+        time.sleep(0.2)
 
     # Markdown生成
     timestamp = now.strftime("%Y-%m-%d-%H-%M")
@@ -284,22 +241,16 @@ def main():
 
         summary_en = p["summary"].replace("\n", " ").strip()
         summary_ja = p.get("summary_ja", "")
+        reason     = attention_reason(p["upvotes"], p["github_stars"])
 
-        if summary_ja:
-            details_block = (
-                '<details>'
-                '<summary>要約を見る</summary>'
-                f'<p>{summary_ja}</p>'
-                f'<p class="abstract">{summary_en}</p>'
-                '</details>'
-            )
-        else:
-            details_block = (
-                '<details>'
-                '<summary>Abstract</summary>'
-                f'<p class="abstract">{summary_en}</p>'
-                '</details>'
-            )
+        details_block = (
+            '<details>'
+            '<summary>要約を見る</summary>'
+            + (f'<p class="reason"><strong>【注目理由】</strong>{reason}</p>' if reason else '')
+            + (f'<p>{summary_ja}</p>' if summary_ja else '')
+            + f'<p class="abstract">{summary_en}</p>'
+            + '</details>'
+        )
 
         lines += [
             f'<div class="paper" data-tags="{data_tags}">',

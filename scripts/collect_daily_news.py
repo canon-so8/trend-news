@@ -435,102 +435,6 @@ def collect_nikkei() -> list[dict]:
     return articles[:20]
 
 
-# --- Gemini統合 ---
-
-def _gemini_client(api_key: str):
-    try:
-        from google import genai
-        return genai.Client(api_key=api_key)
-    except ImportError:
-        print("  google-genai未インストール。スキップ。", file=sys.stderr)
-        return None
-
-
-def gemini_classify_tags(articles: list[dict], api_key: str) -> dict[int, str]:
-    """全記事タイトルをGeminiで20件ずつバッチタグ分類。{index: tag} を返す"""
-    client = _gemini_client(api_key)
-    if not client:
-        return {}
-
-    VALID = {"ai", "ml", "cv", "poem", "eco", "dev", "other"}
-    TAG_DEF = (
-        "ai: AI・LLM・Agent・ClaudeCode・生成AI・ChatGPT・プロンプト・RAG / "
-        "ml: 機械学習・深層学習・強化学習・統計・Kaggle・PyTorch・音声認識 / "
-        "cv: 画像認識・動画・物体検出・3D・diffusion・自動運転 / "
-        "poem: キャリア・エンジニア哲学・転職・組織論・働き方 / "
-        "eco: 経済・産業・半導体・テック企業・スタートアップ・規制 / "
-        "dev: プログラミング・開発ツール・セキュリティ・インフラ・クラウド・OSS / "
-        "other: 上記以外"
-    )
-    results: dict[int, str] = {}
-    batch_size = 20
-    for start in range(0, len(articles), batch_size):
-        batch = articles[start:start + batch_size]
-        batch_json = json.dumps(
-            [{"id": start + i, "title": a["title"]} for i, a in enumerate(batch)],
-            ensure_ascii=False,
-        )
-        prompt = f"""以下の記事タイトルに最適なカテゴリを1つ割り当てJSONのみ返してください。
-カテゴリ定義: {TAG_DEF}
-出力形式: [{{"id": {start}, "tag": "ai"}}, ...]
-タイトル: {batch_json}"""
-        try:
-            resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-            text = resp.text.strip()
-            m = re.search(r'\[.*\]', text, re.DOTALL)
-            if m:
-                text = m.group()
-            for item in json.loads(text):
-                if item.get("tag") in VALID:
-                    results[item["id"]] = item["tag"]
-        except Exception as e:
-            print(f"  Gemini tag分類エラー (batch {start}): {e}", file=sys.stderr)
-        if start + batch_size < len(articles):
-            time.sleep(1)
-    return results
-
-
-def gemini_hn_summaries(hn_articles: list[dict], api_key: str) -> dict[int, str]:
-    """HN記事タイトルから日本語要約を15件ずつバッチ生成。{index: summary} を返す"""
-    client = _gemini_client(api_key)
-    if not client:
-        return {}
-
-    results: dict[int, str] = {}
-    batch_size = 15
-    for start in range(0, len(hn_articles), batch_size):
-        batch = hn_articles[start:start + batch_size]
-        batch_json = json.dumps(
-            [{"id": start + i, "title": a["title"], "pts": a["meta"].get("points", 0)}
-             for i, a in enumerate(batch)],
-            ensure_ascii=False,
-        )
-        prompt = f"""あなたは日本語のテックニュース解説者です。
-Hacker Newsで話題の記事を**必ず日本語**で、各記事2〜3文で要約してください。
-「何についての記事か → なぜHNで注目されているか」の順で書いてください。
-英語で回答しないでください。
-
-JSONのみ返してください:
-[{{"id": {start}, "summary": "日本語の要約"}}, ...]
-
-タイトル:
-{batch_json}"""
-        try:
-            resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-            text = resp.text.strip()
-            m = re.search(r'\[.*\]', text, re.DOTALL)
-            if m:
-                text = m.group()
-            for item in json.loads(text):
-                if item.get("summary"):
-                    results[item["id"]] = item["summary"]
-        except Exception as e:
-            print(f"  Gemini HN要約エラー (batch {start}): {e}", file=sys.stderr)
-        if start + batch_size < len(hn_articles):
-            time.sleep(1)
-    return results
-
-
 # --- Markdown ---
 CSS = """<style>
 .tag { font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
@@ -664,31 +568,6 @@ def main():
     nikkei_articles = recent(nikkei_articles)
     print(f"  3日フィルタ後 → Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
           f"はてな: {len(hatena_articles)}, 日経: {len(nikkei_articles)}")
-
-    # --- Gemini によるタグ分類 + HN要約 ---
-    gemini_key = os.environ.get("GEMINI_API_TOKEN", "")
-    if gemini_key:
-        all_articles = (
-            zenn_articles + qiita_articles + hatena_articles +
-            nikkei_articles + hn_articles
-        )
-        print(f"  Gemini タグ分類中... ({len(all_articles)}件)")
-        tag_map = gemini_classify_tags(all_articles, gemini_key)
-        if tag_map:
-            for i, a in enumerate(all_articles):
-                if i in tag_map:
-                    a["tag"] = tag_map[i]
-            print(f"  Gemini タグ分類完了 ({len(tag_map)}件)")
-
-        print(f"  Gemini HN要約中... ({len(hn_articles)}件)")
-        summary_map = gemini_hn_summaries(hn_articles, gemini_key)
-        if summary_map:
-            for i, a in enumerate(hn_articles):
-                if i in summary_map:
-                    a["meta"]["title_ja"] = summary_map[i]
-            print(f"  Gemini HN要約完了 ({len(summary_map)}件)")
-    else:
-        print("  GEMINI_API_TOKEN未設定。キーワードマッチ + Google Translate を使用。")
 
     lines: list[str] = [
         "---",
