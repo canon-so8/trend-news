@@ -340,22 +340,21 @@ def collect_zenn() -> list[dict]:
 
 
 def collect_qiita() -> list[dict]:
-    """Qiita: popular-items/feed (Atom) からトレンド記事を取得"""
+    """Qiita: popular-items/feed (Atom=トレンド順) + タグ別API補完"""
     seen: set[str] = set()
-    articles: list[dict] = []
+    trend_articles: list[dict] = []
+    tag_articles: list[dict] = []
 
-    # トレンドフィード（https://qiita.com/trend 相当）
+    # トレンドフィード（https://qiita.com/trend 相当、順序がトレンド順）
     r = get("https://qiita.com/popular-items/feed")
     if r:
         for item in parse_rss(r.content):
             if item["url"] and item["url"] not in seen:
                 seen.add(item["url"])
                 item["tag"] = classify_tag(item["title"], item["desc"])
-                if "likes" not in item["meta"]:
-                    item["meta"]["likes"] = 0
-                if "author" not in item["meta"]:
-                    item["meta"]["author"] = ""
-                articles.append(item)
+                item["meta"].setdefault("likes", 0)
+                item["meta"].setdefault("author", "")
+                trend_articles.append(item)
 
     # タグ別でトレンドに載らない専門記事も補完
     since = (datetime.now(JST) - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -387,10 +386,11 @@ def collect_qiita() -> list[dict]:
             for item in items:
                 if item["url"] not in seen:
                     seen.add(item["url"])
-                    articles.append(item)
+                    tag_articles.append(item)
 
-    articles.sort(key=lambda a: a["meta"].get("likes", 0), reverse=True)
-    return articles[:40]
+    # トレンド順を維持（フィード順）+ タグ別をいいね数順で後ろに追加
+    tag_articles.sort(key=lambda a: a["meta"].get("likes", 0), reverse=True)
+    return (trend_articles + tag_articles)[:40]
 
 
 def collect_hatena() -> list[dict]:
