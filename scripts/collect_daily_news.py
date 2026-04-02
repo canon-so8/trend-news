@@ -422,9 +422,9 @@ def collect_hatena() -> list[dict]:
 
 
 def collect_hn() -> list[dict]:
-    """Algolia API + Google Translate でタイトルを日本語訳"""
-    # pts>=100 かつ直近7日以内の記事のみ（古い殿堂入り記事を除外）
-    since_ts = int((datetime.now(timezone.utc) - timedelta(days=7)).timestamp())
+    """Algolia API + Google Translate でタイトルを日本語訳（当日のみ）"""
+    # pts>=100 かつ直近24時間以内の記事のみ
+    since_ts = int((datetime.now(timezone.utc) - timedelta(days=1)).timestamp())
     url = (
         "https://hn.algolia.com/api/v1/search"
         f"?tags=story&numericFilters=points%3E%3D100%2Ccreated_at_i%3E{since_ts}&hitsPerPage=30"
@@ -464,11 +464,11 @@ def collect_hn() -> list[dict]:
 
 
 def collect_nikkei() -> list[dict]:
-    """日経xTech + 日経テクノロジー + ITmedia AI+ RSS"""
+    """日経xTech + 日経テクノロジー RSS（当日のみ）"""
+    today = datetime.now(JST).strftime("%Y-%m-%d")
     urls = [
         "https://xtech.nikkei.com/rss/index.rdf",
         "https://www.nikkei.com/news/category/rss/technology/",
-        "https://rss.itmedia.co.jp/rss/2.0/aiplus.xml",
     ]
     seen: set[str] = set()
     articles: list[dict] = []
@@ -479,6 +479,9 @@ def collect_nikkei() -> list[dict]:
         for item in parse_rss(r.content):
             if item["url"] not in seen:
                 seen.add(item["url"])
+                # 当日の記事のみ（日付なしは含める）
+                if item.get("date") and item["date"][:10] != today:
+                    continue
                 tag = classify_tag(item["title"], item["desc"])
                 if tag in ("ai", "ml", "cv", "eco", "dev"):
                     item["tag"] = tag
