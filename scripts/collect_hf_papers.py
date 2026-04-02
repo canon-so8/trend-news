@@ -53,7 +53,6 @@ CSS = """<style>
 .paper:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 details summary { cursor: pointer; font-size: 0.78rem; color: #888; margin-top: 4px; }
 details p { font-size: 0.82rem; margin: 4px 0 0 12px; color: #555; }
-details p.abstract { font-size: 0.78rem; color: #999; margin-top: 6px; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -263,16 +262,16 @@ def main():
         arxiv_url = f'https://arxiv.org/abs/{p["id"]}'
         hf_date = p.get("hf_date", "")
 
-        summary_en = p["summary"].replace("\n", " ").strip()
         summary_ja = p.get("summary_ja", "")
 
-        details_block = (
-            '<details>'
-            '<summary>Abstract</summary>'
-            + (f'<p>{summary_ja}</p>' if summary_ja else '')
-            + f'<p class="abstract">{summary_en}</p>'
-            + '</details>'
-        )
+        details_block = ""
+        if summary_ja:
+            details_block = (
+                '<details>'
+                '<summary>要約を読む</summary>'
+                f'<p>{summary_ja}</p>'
+                '</details>'
+            )
 
         lines += [
             f'<div class="paper" data-tags="{data_tags}">',
