@@ -105,8 +105,8 @@ jobs:
 
           if daily_url:
               wait_for_url(daily_url, "ニュース")
-              post(f"<{daily_url}|{date_str}: ニュース>")
+              post(f"<{daily_url}|{date_str} : ニュース>")
           if hf_url:
               wait_for_url(hf_url, "トレンド論文")
-              post(f"<{hf_url}|{date_str}: トレンド論文>")
+              post(f"<{hf_url}|{date_str} : トレンド論文>")
           EOF

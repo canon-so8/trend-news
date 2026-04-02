@@ -718,7 +718,7 @@ def main():
     lines: list[str] = [
         "---",
         "layout: post",
-        f'title: "{date_label}: ニュース"',
+        f'title: "{date_label} : ニュース"',
         f"date: {date_label} {time_label}:00 +0900",
         "categories: [daily]",
         "---",

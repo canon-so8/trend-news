@@ -270,7 +270,7 @@ def main():
     lines: list[str] = [
         "---",
         "layout: post",
-        f'title: "{date_label}: トレンド論文"',
+        f'title: "{date_label} : トレンド論文"',
         f"date: {date_label} {time_label}:00 +0900",
         "categories: [arxiv]",
         "---",
