@@ -23,9 +23,13 @@ jobs:
         run: pip install requests
 
       - name: Collect HF Papers
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/collect_hf_papers.py
 
       - name: Collect Daily News
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/collect_daily_news.py
 
       - name: Commit and push

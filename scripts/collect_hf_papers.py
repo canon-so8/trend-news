@@ -89,8 +89,13 @@ def assign_tags(paper: dict) -> list[str]:
     return tags or ["other"]
 
 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+
 def translate_ja(text: str) -> str:
-    """Google Translate 非公式 API でテキストを日本語に翻訳"""
+    """Google Translate 非公式 API でテキストを日本語に翻訳（フォールバック用）"""
     if not text:
         return ""
     url = (
@@ -105,6 +110,59 @@ def translate_ja(text: str) -> str:
         return "".join(chunk[0] for chunk in data[0] if chunk[0])
     except Exception:
         return ""
+
+
+def summarize_papers_gemini(papers: list[dict]) -> dict[str, dict]:
+    """Gemini APIで論文バッチを構造化要約する。
+    戻り値: {arxiv_id: {"reason": "...", "short": "...", "detail": "..."}}
+    """
+    if not GEMINI_API_KEY or not papers:
+        return {}
+
+    # バッチプロンプト構築
+    paper_texts = []
+    for i, p in enumerate(papers):
+        paper_texts.append(
+            f"[{i+1}] ID: {p['id']}\n"
+            f"Title: {p['title']}\n"
+            f"Upvotes: {p['upvotes']}, GitHub Stars: {p['github_stars']}\n"
+            f"Abstract: {p['summary'][:600]}"
+        )
+
+    prompt = f"""以下の{len(papers)}件のarXiv論文について、それぞれ日本語で要約を生成してください。
+
+各論文に対して、以下の3項目をJSON形式で返してください：
+- "reason": 注目理由（1〜2文。従来手法と何が根本的に違うか＋どの分野への波及効果が期待されるか）
+- "short": 短い説明（1〜2文。体言止め可。何を解決する手法で、どんな結果を達成したか）
+- "detail": 詳細要約（3〜5文。高校生でもわかるレベルで「何が問題か→どんなアイデアで解決したか→何がすごいか」の流れ）
+
+レスポンスは以下のJSON形式のみで返してください（余計なテキスト不要）：
+{{"papers": [{{"id": "arxiv_id", "reason": "...", "short": "...", "detail": "..."}}]}}
+
+論文リスト：
+{chr(10).join(paper_texts)}"""
+
+    session = _make_session()
+    try:
+        resp = session.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "responseMimeType": "application/json",
+                },
+            },
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        result = json.loads(text)
+        return {p["id"]: p for p in result.get("papers", [])}
+    except Exception as e:
+        print(f"  Gemini API error: {e}", file=sys.stderr)
+        return {}
 
 
 def _make_session() -> requests.Session:
@@ -196,14 +254,41 @@ def main():
 
     print(f"フィルタ後: {len(filtered)} 件")
 
-    # タグ付け + Google Translateでアブスト翻訳
+    # タグ付け
     for p in filtered:
         p["tags"] = assign_tags(p)
 
-    print(f"  Google Translateでアブスト翻訳中... ({len(filtered)}件)")
+    # Gemini APIで構造化要約を生成（10件ずつバッチ）
+    gemini_results: dict[str, dict] = {}
+    if GEMINI_API_KEY:
+        print(f"  Gemini APIで要約生成中... ({len(filtered)}件)")
+        batch_size = 10
+        for i in range(0, len(filtered), batch_size):
+            batch = filtered[i:i + batch_size]
+            batch_results = summarize_papers_gemini(batch)
+            gemini_results.update(batch_results)
+            if i + batch_size < len(filtered):
+                time.sleep(1)  # レート制限回避
+        print(f"  Gemini要約取得: {len(gemini_results)}/{len(filtered)} 件")
+
+    # Gemini結果を各論文にマッピング、未取得分はGoogle Translateフォールバック
+    fallback_count = 0
     for p in filtered:
-        p["summary_ja"] = translate_ja(p["summary"])
-        time.sleep(0.2)
+        gem = gemini_results.get(p["id"], {})
+        if gem:
+            p["gem_reason"] = gem.get("reason", "")
+            p["gem_short"] = gem.get("short", "")
+            p["gem_detail"] = gem.get("detail", "")
+            p["summary_ja"] = ""  # Geminiがあるので不要
+        else:
+            p["gem_reason"] = ""
+            p["gem_short"] = ""
+            p["gem_detail"] = ""
+            p["summary_ja"] = translate_ja(p["summary"])
+            fallback_count += 1
+            time.sleep(0.2)
+    if fallback_count:
+        print(f"  Google Translateフォールバック: {fallback_count} 件")
 
     # Markdown生成
     timestamp = now.strftime("%Y-%m-%d-%H-%M")
@@ -240,26 +325,58 @@ def main():
         hf_date = p.get("hf_date", "")
 
         summary_en = p["summary"].replace("\n", " ").strip()
+
+        # Gemini要約がある場合はスキル版と同等のリッチ出力
+        gem_reason = p.get("gem_reason", "")
+        gem_short = p.get("gem_short", "")
+        gem_detail = p.get("gem_detail", "")
         summary_ja = p.get("summary_ja", "")
-        reason     = attention_reason(p["upvotes"], p["github_stars"])
 
-        details_block = (
-            '<details>'
-            '<summary>要約を見る</summary>'
-            + (f'<p class="reason"><strong>【注目理由】</strong>{reason}</p>' if reason else '')
-            + (f'<p>{summary_ja}</p>' if summary_ja else '')
-            + f'<p class="abstract">{summary_en}</p>'
-            + '</details>'
-        )
+        if gem_reason or gem_short:
+            # スキル版フォーマット（markdown="1" でJekyllのMarkdown処理を有効化）
+            reason_line = f'\n> **注目理由**: {gem_reason}\n' if gem_reason else ''
+            short_line = f'\n{gem_short}\n' if gem_short else ''
+            detail_block = ""
+            if gem_detail:
+                detail_block = (
+                    '\n<details markdown="1">\n'
+                    '<summary>要約を読む</summary>\n\n'
+                    f'> {gem_detail}\n\n'
+                    '</details>\n'
+                )
 
-        lines += [
-            f'<div class="paper" data-tags="{data_tags}">',
-            f'<p><strong><a href="{arxiv_url}">{p["title"]}</a></strong></p>',
-            f'<p>{tag_spans} {upvote_span}{star_span} · {hf_date[5:]} · {p["first_author"]}{github_link}</p>',
-            details_block,
-            "</div>",
-            "",
-        ]
+            lines += [
+                f'<div class="paper" data-tags="{data_tags}" markdown="1">',
+                "",
+                f'**[{p["title"]}]({arxiv_url})**',
+                "",
+                f'{tag_spans} {upvote_span}{star_span} · {hf_date[5:]} · {p["first_author"]}{github_link}',
+                reason_line,
+                short_line,
+                detail_block,
+                "</div>",
+                "",
+            ]
+        else:
+            # フォールバック: Google Translate版
+            reason = attention_reason(p["upvotes"], p["github_stars"])
+            details_block = (
+                '<details>'
+                '<summary>要約を見る</summary>'
+                + (f'<p class="reason"><strong>【注目理由】</strong>{reason}</p>' if reason else '')
+                + (f'<p>{summary_ja}</p>' if summary_ja else '')
+                + f'<p class="abstract">{summary_en}</p>'
+                + '</details>'
+            )
+
+            lines += [
+                f'<div class="paper" data-tags="{data_tags}">',
+                f'<p><strong><a href="{arxiv_url}">{p["title"]}</a></strong></p>',
+                f'<p>{tag_spans} {upvote_span}{star_span} · {hf_date[5:]} · {p["first_author"]}{github_link}</p>',
+                details_block,
+                "</div>",
+                "",
+            ]
 
     lines += [FILTER_JS, ""]
 

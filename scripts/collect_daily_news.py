@@ -217,6 +217,12 @@ def parse_rss(data: bytes) -> list[dict]:
     return items
 
 
+# --- Gemini API ---
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+
 # --- 翻訳 ---
 def translate_ja(text: str) -> str:
     """Google Translate 非公式 API でテキストを日本語に翻訳する"""
@@ -234,6 +240,97 @@ def translate_ja(text: str) -> str:
         return "".join(chunk[0] for chunk in data[0] if chunk[0])
     except Exception:
         return ""
+
+
+def summarize_hn_gemini(articles: list[dict]) -> dict[str, dict]:
+    """Gemini APIでHN記事バッチの日本語要約を生成。
+    戻り値: {url: {"title_ja": "...", "summary": "..."}}
+    """
+    if not GEMINI_API_KEY or not articles:
+        return {}
+
+    article_texts = []
+    for i, a in enumerate(articles):
+        article_texts.append(
+            f"[{i+1}] URL: {a['url']}\n"
+            f"Title: {a['title']}\n"
+            f"Points: {a['meta'].get('points', 0)}, Comments: {a['meta'].get('comments', 0)}"
+        )
+
+    prompt = f"""以下の{len(articles)}件のHacker News記事について、日本語で要約を生成してください。
+
+各記事に対して：
+- "title_ja": タイトルの日本語訳（1行）
+- "summary": 日本語要約（3〜4文。「何についての記事か → なぜHNで話題か → コメント欄でどんな議論がされているか（推測含む）」の流れ）
+
+レスポンスはJSON形式のみで返してください：
+{{"articles": [{{"url": "...", "title_ja": "...", "summary": "..."}}]}}
+
+記事リスト：
+{chr(10).join(article_texts)}"""
+
+    try:
+        resp = SESSION.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "responseMimeType": "application/json",
+                },
+            },
+            timeout=90,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        result = json.loads(text)
+        return {a["url"]: a for a in result.get("articles", [])}
+    except Exception as e:
+        print(f"  Gemini API error (HN): {e}", file=sys.stderr)
+        return {}
+
+
+def add_point_memos_gemini(source: str, articles: list[dict]) -> dict[str, str]:
+    """Gemini APIで各記事にポイントメモ（1行）を付与。
+    戻り値: {url: "ポイントメモ"}
+    """
+    if not GEMINI_API_KEY or not articles:
+        return {}
+
+    article_texts = []
+    for i, a in enumerate(articles[:40]):  # 最大40件
+        article_texts.append(f"[{i+1}] URL: {a['url']}\nTitle: {a['title']}")
+
+    prompt = f"""以下の{len(article_texts)}件の{source}記事について、それぞれ日本語で1行のポイントメモを付けてください。
+ポイントメモは記事の核心を15〜30文字で簡潔にまとめたものです。
+
+レスポンスはJSON形式のみで返してください：
+{{"memos": [{{"url": "...", "memo": "..."}}]}}
+
+記事リスト：
+{chr(10).join(article_texts)}"""
+
+    try:
+        resp = SESSION.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "responseMimeType": "application/json",
+                },
+            },
+            timeout=90,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        result = json.loads(text)
+        return {m["url"]: m["memo"] for m in result.get("memos", [])}
+    except Exception as e:
+        print(f"  Gemini API error ({source}): {e}", file=sys.stderr)
+        return {}
 
 
 # --- 各ソース収集 ---
@@ -397,11 +494,27 @@ def collect_hn() -> list[dict]:
             },
         })
 
-    # Google Translate で常に翻訳（Geminiが後でオーバーライドする）
-    print(f"  HN翻訳中... ({len(articles)}件)")
-    for a in articles:
-        a["meta"]["title_ja"] = translate_ja(a["title"])
-        time.sleep(0.15)
+    # Gemini APIで要約、フォールバックはGoogle Translate
+    if GEMINI_API_KEY:
+        print(f"  HN: Gemini APIで要約生成中... ({len(articles)}件)")
+        gem_results = summarize_hn_gemini(articles)
+        for a in articles:
+            gem = gem_results.get(a["url"], {})
+            a["meta"]["title_ja"] = gem.get("title_ja", "")
+            a["meta"]["summary_ja"] = gem.get("summary", "")
+        # Geminiで取得できなかった分はGoogle Translateフォールバック
+        fallback = [a for a in articles if not a["meta"]["title_ja"]]
+        if fallback:
+            print(f"  HN: Google Translateフォールバック ({len(fallback)}件)")
+            for a in fallback:
+                a["meta"]["title_ja"] = translate_ja(a["title"])
+                time.sleep(0.15)
+    else:
+        print(f"  HN翻訳中 (Google Translate)... ({len(articles)}件)")
+        for a in articles:
+            a["meta"]["title_ja"] = translate_ja(a["title"])
+            a["meta"]["summary_ja"] = ""
+            time.sleep(0.15)
 
     return articles
 
@@ -483,9 +596,12 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
         count  = a["meta"].get(count_key, 0)
         author = esc(a["meta"].get("author", ""))
         ts     = tag_span(a.get("tag", "other"))
+        memo   = esc(a.get("memo", ""))
         count_str  = f"{count_icon} {count}" if (count_icon and count) else ""
         author_str = f"@{author}" if author else ""
         meta_parts = [p for p in [date, count_str, author_str] if p] + [ts]
+        if memo:
+            meta_parts.append(memo)
         lines += [
             '<div class="item">',
             f'  <div class="item-title"><a href="{url}">{title}</a></div>',
@@ -499,27 +615,29 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
 def render_hn(articles: list[dict]) -> list[str]:
     lines = ['<div id="tab-hn" class="tab-pane">']
     for a in articles:
-        title    = esc(a["title"])
-        title_ja = esc(a["meta"].get("title_ja", ""))
-        url      = a["url"]
-        hn_url   = a["meta"].get("hn_url", "")
-        pts      = a["meta"].get("points", 0)
-        cmts     = a["meta"].get("comments", 0)
-        date     = a.get("date", "")[5:10]
-        ts       = tag_span(a.get("tag", "other"))
+        title      = esc(a["title"])
+        title_ja   = esc(a["meta"].get("title_ja", ""))
+        summary_ja = esc(a["meta"].get("summary_ja", ""))
+        url        = a["url"]
+        hn_url     = a["meta"].get("hn_url", "")
+        pts        = a["meta"].get("points", 0)
+        cmts       = a["meta"].get("comments", 0)
+        date       = a.get("date", "")[5:10]
+        ts         = tag_span(a.get("tag", "other"))
         meta_parts = [p for p in [date, f"🔥 {pts}" if pts else "", f"💬 {cmts}" if cmts else ""] if p] + [ts]
         lines += [
             '<div class="item">',
             f'  <div class="item-title"><a href="{url}">{title}</a></div>',
             f'  <div class="item-meta">{" &nbsp; ".join(meta_parts)}</div>',
         ]
-        if title_ja:
-            lines += [
-                "  <details>",
-                f'    <summary>要約を見る</summary>',
-                f'    <p>{title_ja}</p>',
-                "  </details>",
-            ]
+        if title_ja or summary_ja:
+            lines.append("  <details>")
+            lines.append(f'    <summary>要約を見る</summary>')
+            if title_ja:
+                lines.append(f'    <p><strong>{title_ja}</strong></p>')
+            if summary_ja:
+                lines.append(f'    <p>{summary_ja}</p>')
+            lines.append("  </details>")
         lines.append("</div>")
     lines.append("</div>")
     return lines
@@ -561,6 +679,17 @@ def main():
     nikkei_articles = recent(nikkei_articles)
     print(f"  3日フィルタ後 → Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
           f"はてな: {len(hatena_articles)}, 日経: {len(nikkei_articles)}")
+
+    # Gemini APIでポイントメモ生成（各ソース並列は不要、順次でOK）
+    if GEMINI_API_KEY:
+        print("  Gemini APIでポイントメモ生成中...")
+        for source, arts in [("Zenn", zenn_articles), ("Qiita", qiita_articles),
+                              ("はてな", hatena_articles), ("日経", nikkei_articles)]:
+            memos = add_point_memos_gemini(source, arts)
+            for a in arts:
+                a["memo"] = memos.get(a["url"], "")
+            print(f"    {source}: {len(memos)}/{len(arts)} 件")
+            time.sleep(0.5)
 
     lines: list[str] = [
         "---",
