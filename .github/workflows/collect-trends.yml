@@ -26,6 +26,8 @@ jobs:
         run: pip install requests google-genai
 
       - name: Collect HF Papers
+        env:
+          GEMINI_API_TOKEN: ${{ secrets.GEMINI_API_TOKEN }}
         run: python scripts/collect_hf_papers.py
 
       - name: Collect Daily News

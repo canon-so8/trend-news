@@ -4,6 +4,8 @@ HF Daily Papers 収集スクリプト
 Claude Code 不要 - HF API から直接データ取得してJekyll Markdownを生成
 """
 import json
+import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -48,6 +50,9 @@ CSS = """<style>
 .tab-btn.active { background: #333; color: #fff; }
 .paper { margin-bottom: 0; border-top: 1px solid rgba(128,128,128,0.35); padding-top: 1.2rem; margin-top: 0.8rem; }
 .paper:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+details summary { cursor: pointer; font-size: 0.78rem; color: #888; margin-top: 4px; }
+details p { font-size: 0.82rem; margin: 4px 0 0 12px; color: #555; }
+details p.abstract { font-size: 0.78rem; color: #999; margin-top: 6px; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -110,6 +115,42 @@ def fetch_papers(date_str: str) -> list[dict]:
     return []
 
 
+def gemini_summarize_papers(papers: list[dict], api_key: str) -> dict[int, str]:
+    """HF論文のアブストを日本語で要約。{index: summary_ja} を返す"""
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+    except ImportError:
+        print("  google-genai未インストール。スキップ。", file=sys.stderr)
+        return {}
+
+    titles_json = json.dumps(
+        [{"id": i, "title": p["title"], "abstract": p["summary"][:400]}
+         for i, p in enumerate(papers)],
+        ensure_ascii=False,
+    )
+    prompt = f"""以下のAI/ML論文について、各論文を日本語で3文以内で要約してください。
+「何を提案/解決しているか → どんな手法か → 何が得られたか」の順で書いてください。
+
+JSON配列のみ返してください（説明不要）:
+[{{"id": 0, "summary_ja": "〜〜"}}, ...]
+
+論文:
+{titles_json}"""
+
+    try:
+        resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        text = resp.text.strip()
+        m = re.search(r'\[.*\]', text, re.DOTALL)
+        if m:
+            text = m.group()
+        result = json.loads(text)
+        return {item["id"]: item["summary_ja"] for item in result if item.get("summary_ja")}
+    except Exception as e:
+        print(f"  Gemini 論文要約エラー: {e}", file=sys.stderr)
+        return {}
+
+
 def main():
     now = datetime.now(JST)
     dates = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
@@ -158,6 +199,19 @@ def main():
     # タグ付け
     for p in filtered:
         p["tags"] = assign_tags(p)
+        p["summary_ja"] = ""
+
+    # Gemini 日本語要約
+    gemini_key = os.environ.get("GEMINI_API_TOKEN", "")
+    if gemini_key:
+        print(f"  Gemini 論文要約中... ({len(filtered)}件)")
+        summary_map = gemini_summarize_papers(filtered, gemini_key)
+        for i, p in enumerate(filtered):
+            if i in summary_map:
+                p["summary_ja"] = summary_map[i]
+        print(f"  Gemini 論文要約完了 ({len(summary_map)}件)")
+    else:
+        print("  GEMINI_API_TOKEN未設定。英語アブストのみ表示。")
 
     # Markdown生成
     timestamp = now.strftime("%Y-%m-%d-%H-%M")
@@ -192,17 +246,30 @@ def main():
         github_link = f' · [GitHub]({p["github_repo"]})' if p["github_repo"] else ""
         arxiv_url = f'https://arxiv.org/abs/{p["id"]}'
 
-        summary = p["summary"].replace("\n", " ").strip()
+        summary_en = p["summary"].replace("\n", " ").strip()
+        summary_ja = p.get("summary_ja", "")
+
+        if summary_ja:
+            details_block = (
+                '<details>'
+                '<summary>要約を見る</summary>'
+                f'<p>{summary_ja}</p>'
+                f'<p class="abstract">{summary_en}</p>'
+                '</details>'
+            )
+        else:
+            details_block = (
+                '<details>'
+                '<summary>Abstract</summary>'
+                f'<p class="abstract">{summary_en}</p>'
+                '</details>'
+            )
 
         lines += [
-            f'<div class="paper" data-tags="{data_tags}" markdown="1">',
-            "",
-            f'**[{p["title"]}]({arxiv_url})**',
-            "",
-            f'{tag_spans} {upvote_span}{star_span} · {p["published_at"]} · {p["first_author"]}{github_link}',
-            "",
-            f'{summary}',
-            "",
+            f'<div class="paper" data-tags="{data_tags}">',
+            f'<p><strong><a href="{arxiv_url}">{p["title"]}</a></strong></p>',
+            f'<p>{tag_spans} {upvote_span}{star_span} · {p["published_at"]} · {p["first_author"]}{github_link}</p>',
+            details_block,
             "</div>",
             "",
         ]
