@@ -180,7 +180,7 @@ def main():
                 "upvotes": paper.get("upvotes", 0) or 0,
                 "github_stars": paper.get("githubStars", 0) or 0,
                 "github_repo": paper.get("githubRepo"),
-                "published_at": (paper.get("publishedAt") or "")[:10],
+                "hf_date": d,  # HFでフィーチャーされた日付（表示用）
                 "first_author": ((paper.get("authors") or [{}])[0]).get("name", ""),
                 "ai_keywords": paper.get("ai_keywords", []),
             })
@@ -243,8 +243,9 @@ def main():
             f' <span class="tag tag-hf">★ {p["github_stars"]} stars</span>'
             if p["github_stars"] > 0 else ""
         )
-        github_link = f' · [GitHub]({p["github_repo"]})' if p["github_repo"] else ""
+        github_link = f' · <a href="{p["github_repo"]}">GitHub</a>' if p["github_repo"] else ""
         arxiv_url = f'https://arxiv.org/abs/{p["id"]}'
+        hf_date = p.get("hf_date", "")
 
         summary_en = p["summary"].replace("\n", " ").strip()
         summary_ja = p.get("summary_ja", "")
@@ -268,7 +269,7 @@ def main():
         lines += [
             f'<div class="paper" data-tags="{data_tags}">',
             f'<p><strong><a href="{arxiv_url}">{p["title"]}</a></strong></p>',
-            f'<p>{tag_spans} {upvote_span}{star_span} · {p["published_at"]} · {p["first_author"]}{github_link}</p>',
+            f'<p>{tag_spans} {upvote_span}{star_span} · {hf_date} · {p["first_author"]}{github_link}</p>',
             details_block,
             "</div>",
             "",
