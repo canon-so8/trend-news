@@ -50,7 +50,7 @@ jobs:
           token = os.environ.get("SLACK_BOT_TOKEN", "")
           now = datetime.now(timezone(timedelta(hours=9)))
           date_str = now.strftime("%Y-%m-%d")
-          text = f"trend-news 更新完了 {date_str}\n<https://canon-so8.github.io/trend-news/|サイトを開く>"
+          text = f"trend-news 更新完了 {date_str}\n<https://canon-so8.github.io/trend-news/|GithubActions定期実行:今日のニュース/トレンド論文>"
           data = json.dumps({"channel": "C0APSDG0WKX", "text": text}).encode("utf-8")
           req = urllib.request.Request(
               "https://slack.com/api/chat.postMessage",
