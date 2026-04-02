@@ -454,18 +454,21 @@ def collect_hn() -> list[dict]:
             },
         })
 
-    # Google Translate でタイトルを翻訳
-    print(f"  HN翻訳中... ({len(articles)}件)")
-    for a in articles:
-        a["meta"]["title_ja"] = translate_ja(a["title"])
-        time.sleep(0.15)
+    # タイトル翻訳（DEEPL_ENABLED時のみ翻訳、それ以外はスキップ）
+    if DEEPL_ENABLED:
+        print(f"  HN翻訳中... ({len(articles)}件)")
+        for a in articles:
+            a["meta"]["title_ja"] = translate_ja(a["title"])
+            time.sleep(0.15)
+    else:
+        print(f"  HN翻訳スキップ（DEEPL_ENABLED=false）")
 
     return articles
 
 
 def collect_nikkei() -> list[dict]:
-    """日経xTech + 日経テクノロジー RSS（当日のみ）"""
-    today = datetime.now(JST).strftime("%Y-%m-%d")
+    """日経xTech + 日経テクノロジー RSS（直近3日）"""
+    cutoff = (datetime.now(JST) - timedelta(days=3)).strftime("%Y-%m-%d")
     urls = [
         "https://xtech.nikkei.com/rss/index.rdf",
         "https://www.nikkei.com/news/category/rss/technology/",
@@ -479,8 +482,8 @@ def collect_nikkei() -> list[dict]:
         for item in parse_rss(r.content):
             if item["url"] not in seen:
                 seen.add(item["url"])
-                # 当日の記事のみ（日付なしは含める）
-                if item.get("date") and item["date"][:10] != today:
+                # 直近3日の記事のみ（日付なしは含める）
+                if item.get("date") and item["date"][:10] < cutoff:
                     continue
                 tag = classify_tag(item["title"], item["desc"])
                 if tag in ("ai", "ml", "cv", "eco", "dev"):

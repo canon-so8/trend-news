@@ -234,7 +234,7 @@ def main():
 
     print(f"フィルタ後: {len(filtered)} 件")
 
-    # タグ付け + Google Translateでアブスト翻訳
+    # タグ付け
     for p in filtered:
         p["tags"] = assign_tags(p)
 
@@ -250,10 +250,17 @@ def main():
             endpoint = "api-free" if DEEPL_AUTH_KEY.endswith(":fx") else "api (Pro)"
             print(f"  アブスト翻訳中... ({len(filtered)}件, DeepL={endpoint})")
     else:
-        print(f"  アブスト翻訳中... ({len(filtered)}件, Google Translate)")
-    for p in filtered:
-        p["summary_ja"] = translate_ja(p["summary"])
-        time.sleep(0.3)
+        if DEEPL_AUTH_KEY:
+            print(f"  翻訳スキップ（DEEPL_ENABLED=false）")
+        else:
+            print(f"  翻訳スキップ（DEEPL_AUTH_KEY未設定）")
+    if DEEPL_ENABLED:
+        for p in filtered:
+            p["summary_ja"] = translate_ja(p["summary"])
+            time.sleep(0.3)
+    else:
+        for p in filtered:
+            p["summary_ja"] = ""
 
     # Markdown生成
     timestamp = now.strftime("%Y-%m-%d-%H-%M")
