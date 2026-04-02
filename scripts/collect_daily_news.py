@@ -349,12 +349,26 @@ def collect_qiita() -> list[dict]:
     r = get("https://qiita.com/popular-items/feed")
     if r:
         for item in parse_rss(r.content):
+            item["url"] = _strip_utm(item["url"])
             if item["url"] and item["url"] not in seen:
                 seen.add(item["url"])
                 item["tag"] = classify_tag(item["title"], item["desc"])
                 item["meta"].setdefault("likes", 0)
                 item["meta"].setdefault("author", "")
                 trend_articles.append(item)
+
+    # トレンド記事のlikes_countをAPI経由で補完
+    for a in trend_articles:
+        # URLからitem_idを抽出: https://qiita.com/user/items/XXXXX → XXXXX
+        parts = a["url"].rstrip("/").split("/")
+        if len(parts) >= 2 and parts[-2] == "items":
+            item_id = parts[-1]
+            r2 = get(f"https://qiita.com/api/v2/items/{item_id}")
+            if r2:
+                data = r2.json()
+                a["meta"]["likes"] = data.get("likes_count", 0) or 0
+                a["meta"]["author"] = (data.get("user") or {}).get("id", "")
+                a["date"] = (data.get("created_at") or "")[:10]
 
     # タグ別でトレンドに載らない専門記事も補完
     since = (datetime.now(JST) - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -534,6 +548,15 @@ function switchTab(id, btn) {
 </script>"""
 
 
+def _strip_utm(url: str) -> str:
+    """URLからUTMパラメータを除去して正規化"""
+    if "?" not in url:
+        return url
+    base, _, qs = url.partition("?")
+    params = [p for p in qs.split("&") if not p.startswith("utm_")]
+    return f"{base}?{'&'.join(params)}" if params else base
+
+
 def esc(s: str) -> str:
     return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -626,13 +649,14 @@ def main():
     print(f"  日付フィルタ後 → Zenn: {len(zenn_articles)}(フィルタなし), Qiita: {len(qiita_articles)}, "
           f"はてな: {len(hatena_articles)}, 日経: {len(nikkei_articles)}")
 
-    # --- タブ間の重複排除（先のタブを優先）---
+    # --- タブ間の重複排除（先のタブを優先、UTMパラメータ除去して比較）---
     global_seen: set[str] = set()
     def dedup(arts: list[dict]) -> list[dict]:
         result = []
         for a in arts:
-            if a["url"] not in global_seen:
-                global_seen.add(a["url"])
+            canonical = _strip_utm(a["url"])
+            if canonical not in global_seen:
+                global_seen.add(canonical)
                 result.append(a)
         return result
     zenn_articles   = dedup(zenn_articles)
