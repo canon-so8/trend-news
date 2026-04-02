@@ -1,12 +1,9 @@
 name: Collect Trends
 
 on:
-  workflow_dispatch:  # 手動実行のみ（スケジュールは未設定）
-
-# TODO: 定期実行を有効にする場合は以下を on: に追加
-#   schedule:
-#     - cron: "0 0 * * *"   # 毎朝 9:00 JST
-#     - cron: "0 12 * * *"  # 毎夕 21:00 JST
+  schedule:
+    - cron: "0 3 * * 1-5"  # 平日 12:00 JST（※祝日は除外不可、土日のみ除外）
+  workflow_dispatch:  # 手動実行も可
 
 # TODO: Slack通知を有効にする場合は SLACK_BOT_TOKEN を GitHub Secrets に登録して
 #       下部のコメントアウトを外す
