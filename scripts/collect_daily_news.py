@@ -288,7 +288,7 @@ QIITA_TAGS = [
 
 
 def collect_zenn() -> list[dict]:
-    """Zenn API: デイリートレンド順で取得してからいいね数でソート"""
+    """Zenn API: ウィークリートレンド（explore相当）で取得してからいいね数でソート"""
     seen: set[str] = set()
     articles: list[dict] = []
 
@@ -309,15 +309,15 @@ def collect_zenn() -> list[dict]:
         }
 
     def fetch_topic(topic: str) -> list[dict]:
-        url = f"https://zenn.dev/api/articles?topicname={topic}&order=daily&count=20"
+        url = f"https://zenn.dev/api/articles?topicname={topic}&order=weekly&count=20"
         r = get(url)
         if not r:
             return []
         return [p for a in r.json().get("articles", []) if (p := _parse(a))]
 
-    # トップページ: Techs + Ideas（デイリートレンド）
+    # Techs + Ideas（ウィークリートレンド = explore ページ相当）
     for atype in ("tech", "idea"):
-        r = get(f"https://zenn.dev/api/articles?order=daily&count=50&article_type={atype}")
+        r = get(f"https://zenn.dev/api/articles?order=weekly&count=50&article_type={atype}")
         if r:
             for a in r.json().get("articles", []):
                 p = _parse(a)
