@@ -4,12 +4,15 @@ HF Daily Papers 収集スクリプト
 Claude Code 不要 - HF API から直接データ取得してJekyll Markdownを生成
 """
 import json
-import os
 import sys
-import urllib.request
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 JST = timezone(timedelta(hours=9))
 REPO_ROOT = Path(__file__).parent.parent
@@ -79,24 +82,41 @@ def assign_tags(paper: dict) -> list[str]:
     return tags or ["other"]
 
 
+def _make_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(total=3, backoff_factor=1.5, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    })
+    return session
+
+
 def fetch_papers(date_str: str) -> list[dict]:
     url = f"https://huggingface.co/api/daily_papers?date={date_str}"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode())
-    except Exception as e:
-        print(f"  {date_str}: fetch error ({e})", file=sys.stderr)
-        return []
+    for attempt in range(3):
+        try:
+            session = _make_session()
+            resp = session.get(url, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            print(f"  {date_str}: {len(data)} 件")
+            return data
+        except Exception as e:
+            print(f"  {date_str}: attempt {attempt+1} error ({e})", file=sys.stderr)
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    return []
 
 
 def main():
     now = datetime.now(JST)
     dates = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
 
-    # 7日分を並列取得
+    # 7日分を並列取得（max_workers=3でレート制限回避）
     results: dict[str, list] = {}
-    with ThreadPoolExecutor(max_workers=7) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         futures = {ex.submit(fetch_papers, d): d for d in dates}
         for fut in as_completed(futures):
             d = futures[fut]
