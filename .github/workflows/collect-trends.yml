@@ -23,9 +23,13 @@ jobs:
         run: pip install requests
 
       - name: Collect HF Papers
+        env:
+          DEEPL_AUTH_KEY: ${{ secrets.DEEPL_AUTH_KEY }}
         run: python scripts/collect_hf_papers.py
 
       - name: Collect Daily News
+        env:
+          DEEPL_AUTH_KEY: ${{ secrets.DEEPL_AUTH_KEY }}
         run: python scripts/collect_daily_news.py
 
       - name: Commit and push

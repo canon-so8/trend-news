@@ -4,9 +4,11 @@ HF Daily Papers 収集スクリプト
 Claude Code 不要 - HF API から直接データ取得してJekyll Markdownを生成
 """
 import json
+import os
 import re
 import sys
 import time
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -86,6 +88,52 @@ def assign_tags(paper: dict) -> list[str]:
     return tags or ["other"]
 
 
+DEEPL_AUTH_KEY = os.environ.get("DEEPL_AUTH_KEY", "")
+
+
+def translate_deepl(text: str) -> str:
+    """DeepL API Free で英語→日本語翻訳"""
+    if not DEEPL_AUTH_KEY or not text:
+        return ""
+    try:
+        resp = requests.post(
+            "https://api-free.deepl.com/v2/translate",
+            data={"auth_key": DEEPL_AUTH_KEY, "text": text[:1500], "target_lang": "JA"},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return resp.json()["translations"][0]["text"]
+        print(f"  DeepL HTTP {resp.status_code}: {resp.text[:200]}", file=sys.stderr)
+    except Exception as e:
+        print(f"  DeepL error: {e}", file=sys.stderr)
+    return ""
+
+
+def translate_google(text: str) -> str:
+    """Google Translate 非公式 API（フォールバック用）"""
+    if not text:
+        return ""
+    url = (
+        "https://translate.googleapis.com/translate_a/single"
+        f"?client=gtx&sl=en&tl=ja&dt=t&q={urllib.parse.quote(text[:500])}"
+    )
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        return "".join(chunk[0] for chunk in data[0] if chunk[0])
+    except Exception:
+        return ""
+
+
+def translate_ja(text: str) -> str:
+    """DeepL優先、フォールバックでGoogle Translate"""
+    result = translate_deepl(text)
+    if result:
+        return result
+    return translate_google(text)
+
+
 def _make_session() -> requests.Session:
     session = requests.Session()
     retry = Retry(total=3, backoff_factor=1.5, status_forcelist=[429, 500, 502, 503, 504])
@@ -163,7 +211,11 @@ def main():
     for p in filtered:
         p["tags"] = assign_tags(p)
 
-    print(f"フィルタ・タグ付け完了")
+    # DeepL/Google Translateでアブスト翻訳
+    print(f"  アブスト翻訳中... ({len(filtered)}件, DeepL={'有効' if DEEPL_AUTH_KEY else '未設定'})")
+    for p in filtered:
+        p["summary_ja"] = translate_ja(p["summary"])
+        time.sleep(0.3)
 
     # Markdown生成
     timestamp = now.strftime("%Y-%m-%d-%H-%M")
@@ -200,10 +252,12 @@ def main():
         hf_date = p.get("hf_date", "")
 
         summary_en = p["summary"].replace("\n", " ").strip()
+        summary_ja = p.get("summary_ja", "")
 
         details_block = (
             '<details>'
             '<summary>Abstract</summary>'
+            + (f'<p>{summary_ja}</p>' if summary_ja else '')
             + f'<p class="abstract">{summary_en}</p>'
             + '</details>'
         )

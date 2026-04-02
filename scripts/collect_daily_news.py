@@ -11,6 +11,7 @@ Claude Code 不要 - RSS/API から直接データ取得してJekyll Markdownを
   - xTech  : RSS 1.0/RDF
 """
 import json
+import os
 import re
 import sys
 import time
@@ -216,8 +217,29 @@ def parse_rss(data: bytes) -> list[dict]:
 
 
 # --- 翻訳 ---
-def translate_ja(text: str) -> str:
-    """Google Translate 非公式 API でテキストを日本語に翻訳する"""
+DEEPL_AUTH_KEY = os.environ.get("DEEPL_AUTH_KEY", "")
+
+
+def translate_deepl(text: str) -> str:
+    """DeepL API Free で英語→日本語翻訳"""
+    if not DEEPL_AUTH_KEY or not text:
+        return ""
+    try:
+        resp = SESSION.post(
+            "https://api-free.deepl.com/v2/translate",
+            data={"auth_key": DEEPL_AUTH_KEY, "text": text[:1500], "target_lang": "JA"},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return resp.json()["translations"][0]["text"]
+        print(f"  DeepL HTTP {resp.status_code}: {resp.text[:200]}", file=sys.stderr)
+    except Exception as e:
+        print(f"  DeepL error: {e}", file=sys.stderr)
+    return ""
+
+
+def translate_google(text: str) -> str:
+    """Google Translate 非公式 API（フォールバック用）"""
     if not text:
         return ""
     url = (
@@ -232,6 +254,14 @@ def translate_ja(text: str) -> str:
         return "".join(chunk[0] for chunk in data[0] if chunk[0])
     except Exception:
         return ""
+
+
+def translate_ja(text: str) -> str:
+    """DeepL優先、フォールバックでGoogle Translate"""
+    result = translate_deepl(text)
+    if result:
+        return result
+    return translate_google(text)
 
 
 # --- 各ソース収集 ---
@@ -323,6 +353,24 @@ def collect_qiita() -> list[dict]:
                 })
         return result
 
+    # トップページ（全体トレンド）
+    r = get("https://qiita.com/api/v2/items?per_page=20&query=stocks:>5")
+    if r:
+        for it in r.json():
+            art_url = it.get("url", "")
+            title = it.get("title", "")
+            if title and art_url and art_url not in seen:
+                seen.add(art_url)
+                articles.append({
+                    "title": title, "url": art_url,
+                    "date": (it.get("created_at") or "")[:10], "desc": "",
+                    "tag": classify_tag(title),
+                    "meta": {
+                        "likes": it.get("likes_count", 0) or 0,
+                        "author": (it.get("user") or {}).get("id", ""),
+                    },
+                })
+
     with ThreadPoolExecutor(max_workers=5) as ex:
         for items in ex.map(fetch_tag, QIITA_TAGS):
             for item in items:
@@ -405,9 +453,10 @@ def collect_hn() -> list[dict]:
 
 
 def collect_nikkei() -> list[dict]:
-    """日経xTech + ITmedia AI+ RSS"""
+    """日経xTech + 日経テクノロジー + ITmedia AI+ RSS"""
     urls = [
         "https://xtech.nikkei.com/rss/index.rdf",
+        "https://www.nikkei.com/news/category/rss/technology/",
         "https://rss.itmedia.co.jp/rss/2.0/aiplus.xml",
     ]
     seen: set[str] = set()
