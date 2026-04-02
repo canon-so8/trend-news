@@ -11,6 +11,7 @@ Claude Code 不要 - RSS/API から直接データ取得してJekyll Markdownを
   - xTech  : RSS 1.0/RDF
 """
 import json
+import re
 import sys
 import time
 import urllib.parse
@@ -35,18 +36,63 @@ ATOM   = "http://www.w3.org/2005/Atom"
 RDF    = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 HATENA = "http://www.hatena.ne.jp/info/xmlns#"
 
-# --- タグ判定 ---
-AI_KEYWORDS   = ["ai", "llm", "agent", "gpt", "claude", "gemini", "openai", "anthropic",
-                 "chatgpt", "機械学習", "深層学習", "人工知能", "生成ai", "大規模言語"]
-ML_KEYWORDS   = ["machine learning", "deep learning", "reinforcement", "pytorch", "tensorflow",
-                 "kaggle", "neural", "モデル学習", "ファインチューニング", "統計", "回帰", "分類"]
-CV_KEYWORDS   = ["image", "video", "vision", "diffusion", "画像", "動画", "映像", "3d", "点群"]
-POEM_KEYWORDS = ["キャリア", "エンジニア哲学", "転職", "仕事術", "思想", "ポエム", "考え方",
-                 "生き方", "働き方", "マインド", "culture", "philosophy"]
-ECO_KEYWORDS  = ["経済", "半導体", "nvidia", "tsmc", "テック企業", "産業", "規制", "政策",
-                 "株価", "business", "startup", "vc", "融資", "ipo"]
-DEV_KEYWORDS  = ["python", "javascript", "typescript", "rust", "go ", "java", "kubernetes",
-                 "docker", "linux", "cli", "api", "sdk", "vscode", "開発ツール", "プログラミング"]
+# --- タグ判定（優先順位: AI > ML > CV > POEM > ECO > DEV > other）---
+AI_KEYWORDS   = [
+    "llm", "agent", "agentic", "gpt", "claude", "gemini", "openai", "anthropic",
+    "chatgpt", "生成ai", "大規模言語", "プロンプト", "rag", "chain-of-thought",
+    "reasoning", "fine-tun", "ファインチューニング", "alignment", "ai agent",
+    "mcp ", "claude code", "copilot", "cursor ", "人工知能", "生成モデル",
+]
+ML_KEYWORDS   = [
+    "machine learning", "deep learning", "reinforcement learning", "pytorch", "tensorflow",
+    "kaggle", "neural network", "transformer", "bert", "llama", "optimizer",
+    "機械学習", "深層学習", "強化学習", "ニューラル",
+    "統計学", "統計的", "回帰分析", "分類問題", "クラスタリング", "特徴量",
+    "学習率", "活性化関数", "損失関数", "バックプロパゲーション",
+    "scikit", "xgboost", "lightgbm", "catboost", "データサイエンス",
+    "過学習", "正則化", "バッチ正規化", "アテンション機構",
+    "特徴抽出", "埋め込みモデル", "テキスト埋め込み", "ベイズ", "tabnet",
+    "分散並列", "並列学習", "コンペ", "モデル学習", "自然言語処理",
+    # 音声系もML扱い（daily newsにはaudioタグなし）
+    "音声認識", "音声合成", "音声処理", "音響", "asr", "tts", "speech recognition",
+    "speech synthesis", "音声モデル",
+]
+CV_KEYWORDS   = [
+    "image", "video", "vision", "diffusion", "gan", "vae", "3d reconstruction",
+    "yolo", "resnet", "vit ", "pose estimation", "depth estimation",
+    "画像認識", "画像生成", "動画生成", "物体検出", "セグメンテーション", "ocr",
+    "コンピュータビジョン", "点群", "自動運転", "autonomous driving",
+    "ロボット", "robot", "lerobot", "3次元",
+]
+POEM_KEYWORDS = [
+    "キャリア", "エンジニア哲学", "転職", "仕事術", "思想", "ポエム",
+    "生き方", "働き方", "マインド", "組織論", "チームビルディング",
+    "エンジニアリング文化", "リーダーシップ", "マネジメント論", "culture",
+    "philosophy", "エンジニアとして", "技術者として", "プログラマとして",
+]
+ECO_KEYWORDS  = [
+    "経済", "半導体", "nvidia", "tsmc", "テック企業", "産業動向", "規制",
+    "政策", "株価", "business", "startup", "スタートアップ", "vc ", "融資",
+    "ipo", "資金調達", "市場規模", "シェア", "競合", "買収", "合併",
+    "apple", "google", "microsoft", "meta ", "amazon", "tesla",
+]
+DEV_KEYWORDS  = [
+    "python", "javascript", "typescript", "rust", "go ", "java ", "kotlin",
+    "swift", "c++", "c#", "kubernetes", "docker", "linux", "cli", "sdk", "vscode",
+    "ios開発", "android開発", "アプリ開発", "ios向け",
+    "プログラミング", "コーディング", "ライブラリ", "フレームワーク",
+    "npm", "pip ", "パッケージ", "依存関係", "git ", "github",
+    "デプロイ", "インフラ", "クラウド", "aws", "gcp", "azure",
+    "セキュリティ", "脆弱性", "サプライチェーン", "暗号化", "認証",
+    "データベース", "sql", "postgresql", "redis", "mongodb",
+    "バグ", "テスト", "ci/cd", "コマンドライン", "ターミナル", "シェルスクリプト",
+    "bash ", "zsh", "makefile", "api設計", "マイクロサービス", "サーバーレス",
+    "全文検索", "uuid", "スキーマ", "orm ", "migration", "パフォーマンス",
+    "リファクタリング", "コードレビュー", "開発環境", "wsl", "homebrew",
+    "ログ設計", "ログ収集", "監視", "オブザーバビリティ", "rest api", "restapi",
+    "テーブル設計", "スキーマ設計", "hostsファイル", "crowdstrike",
+    "ssh", "ssl", "tls", "xss", "csrf", "ペネトレーション",
+]
 
 TAG_LABELS = {
     "ai":    ("AI",    "tag-ai"),
@@ -59,9 +105,14 @@ TAG_LABELS = {
 }
 
 
+# "ai" を単体でマッチ（"api","mail","detail"などへの誤検知を防ぐため正規表現）
+_AI_SOLO_RE = re.compile(r'(?<![a-z])ai(?![a-z])')
+
+
 def classify_tag(title: str, desc: str = "") -> str:
     text = (title + " " + desc).lower()
     if any(k in text for k in AI_KEYWORDS):   return "ai"
+    if _AI_SOLO_RE.search(text):               return "ai"
     if any(k in text for k in ML_KEYWORDS):   return "ml"
     if any(k in text for k in CV_KEYWORDS):   return "cv"
     if any(k in text for k in POEM_KEYWORDS): return "poem"
@@ -213,10 +264,11 @@ def collect_zenn() -> list[dict]:
             title = a.get("title", "")
             pub = (a.get("published_at") or "")[:10]
             likes = a.get("liked_count", 0) or 0
+            author = (a.get("user") or {}).get("name", "")
             if title and slug:
                 result.append({
                     "title": title, "url": art_url, "date": pub, "desc": "",
-                    "meta": {"likes": likes},
+                    "meta": {"likes": likes, "author": author},
                 })
         return result
 
@@ -231,7 +283,10 @@ def collect_zenn() -> list[dict]:
                 articles.append({
                     "title": a["title"], "url": art_url,
                     "date": (a.get("published_at") or "")[:10], "desc": "",
-                    "meta": {"likes": a.get("liked_count", 0) or 0},
+                    "meta": {
+                        "likes": a.get("liked_count", 0) or 0,
+                        "author": (a.get("user") or {}).get("name", ""),
+                    },
                 })
 
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -269,7 +324,10 @@ def collect_qiita() -> list[dict]:
                 result.append({
                     "title": title, "url": art_url,
                     "date": (it.get("created_at") or "")[:10], "desc": "",
-                    "meta": {"likes": it.get("likes_count", 0) or 0},
+                    "meta": {
+                        "likes": it.get("likes_count", 0) or 0,
+                        "author": (it.get("user") or {}).get("id", ""),
+                    },
                 })
         return result
 
@@ -314,9 +372,11 @@ def collect_hatena() -> list[dict]:
 
 def collect_hn() -> list[dict]:
     """Algolia API + Google Translate でタイトルを日本語訳"""
+    # pts>=100 かつ直近7日以内の記事のみ（古い殿堂入り記事を除外）
+    since_ts = int((datetime.now(timezone.utc) - timedelta(days=7)).timestamp())
     url = (
         "https://hn.algolia.com/api/v1/search"
-        "?tags=story&numericFilters=points%3E80&hitsPerPage=20"
+        f"?tags=story&numericFilters=points%3E%3D100%2Ccreated_at_i%3E{since_ts}&hitsPerPage=30"
         "&attributesToRetrieve=title,url,points,num_comments,created_at,objectID"
     )
     r = get(url)
@@ -423,13 +483,15 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
     active = " active" if tab_id == "zenn" else ""
     lines = [f'<div id="tab-{tab_id}" class="tab-pane{active}">']
     for a in articles:
-        title = esc(a["title"])
-        url   = a["url"]
-        date  = a.get("date", "")[:7]
-        count = a["meta"].get(count_key, 0)
-        ts    = tag_span(a.get("tag", "other"))
-        count_str = f"{count_icon} {count}" if count else ""
-        meta_parts = [p for p in [date, count_str] if p] + [ts]
+        title  = esc(a["title"])
+        url    = a["url"]
+        date   = a.get("date", "")[:7]
+        count  = a["meta"].get(count_key, 0)
+        author = esc(a["meta"].get("author", ""))
+        ts     = tag_span(a.get("tag", "other"))
+        count_str  = f"{count_icon} {count}" if (count_icon and count) else ""
+        author_str = f"@{author}" if author else ""
+        meta_parts = [p for p in [date, count_str, author_str] if p] + [ts]
         lines += [
             '<div class="item">',
             f'  <div class="item-title"><a href="{url}">{title}</a></div>',
