@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -85,6 +86,24 @@ def assign_tags(paper: dict) -> list[str]:
     ).lower()
     tags = [tag for tag, keywords in TAGS_RULES.items() if any(kw in text for kw in keywords)]
     return tags or ["other"]
+
+
+def translate_ja(text: str) -> str:
+    """Google Translate 非公式 API でテキストを日本語に翻訳"""
+    if not text:
+        return ""
+    url = (
+        "https://translate.googleapis.com/translate_a/single"
+        f"?client=gtx&sl=en&tl=ja&dt=t&q={urllib.parse.quote(text[:500])}"
+    )
+    try:
+        s = _make_session()
+        r = s.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        return "".join(chunk[0] for chunk in data[0] if chunk[0])
+    except Exception:
+        return ""
 
 
 def _make_session() -> requests.Session:
@@ -219,7 +238,15 @@ def main():
                 p["summary_ja"] = summary_map[i]
         print(f"  Gemini 論文要約完了 ({len(summary_map)}件)")
     else:
-        print("  GEMINI_API_TOKEN未設定。英語アブストのみ表示。")
+        print("  GEMINI_API_TOKEN未設定。Google Translateでアブスト翻訳。")
+
+    # Gemini要約がない論文はGoogle Translateで補完
+    need_translate = [p for p in filtered if not p["summary_ja"]]
+    if need_translate:
+        print(f"  Google Translate フォールバック翻訳中... ({len(need_translate)}件)")
+        for p in need_translate:
+            p["summary_ja"] = translate_ja(p["summary"])
+            time.sleep(0.2)
 
     # Markdown生成
     timestamp = now.strftime("%Y-%m-%d-%H-%M")

@@ -49,8 +49,9 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
           python - <<'EOF'
-          import json, urllib.request, os
+          import json, urllib.request, os, time
           from pathlib import Path
+          from datetime import datetime, timezone, timedelta
 
           token = os.environ.get("SLACK_BOT_TOKEN", "")
           if not token:
@@ -66,11 +67,15 @@ jobs:
               )
               print(json.loads(urllib.request.urlopen(req).read()).get("ok"))
 
+          now = datetime.now(timezone(timedelta(hours=9)))
+          date_str = now.strftime("%Y-%m-%d")
+
           daily_url = Path("/tmp/daily_url.txt").read_text().strip() if Path("/tmp/daily_url.txt").exists() else ""
           hf_url    = Path("/tmp/hf_url.txt").read_text().strip()    if Path("/tmp/hf_url.txt").exists()    else ""
 
           if daily_url:
-              post(f"📰 <{daily_url}|本日のニュース（Zenn・Qiita・はてブ・HN）>")
+              post(f"<{daily_url}|{date_str}のニュース>")
+          time.sleep(1)
           if hf_url:
-              post(f"📄 <{hf_url}|本日のトレンド論文（HuggingFace）>")
+              post(f"<{hf_url}|{date_str}のトレンド論文>")
           EOF
