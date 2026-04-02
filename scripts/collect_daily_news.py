@@ -317,7 +317,7 @@ def collect_zenn() -> list[dict]:
 
     # トップページ: Techs + Ideas（デイリートレンド）
     for atype in ("tech", "idea"):
-        r = get(f"https://zenn.dev/api/articles?order=daily&count=30&article_type={atype}")
+        r = get(f"https://zenn.dev/api/articles?order=daily&count=50&article_type={atype}")
         if r:
             for a in r.json().get("articles", []):
                 p = _parse(a)
@@ -610,16 +610,16 @@ def main():
     print(f"  Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
           f"はてな: {len(hatena_articles)}, HN: {len(hn_articles)}, 日経: {len(nikkei_articles)}")
 
-    # --- 14日以内の記事に絞る（トレンドで古い記事がバズることがあるため余裕を持たせる）---
+    # --- 日付フィルタ（Zennはトレンドなのでフィルタなし、他は14日）---
     cutoff = (now - timedelta(days=14)).strftime("%Y-%m-%d")
     def recent(arts: list[dict]) -> list[dict]:
         """date が cutoff 以降の記事のみ残す。日付なし記事は保持。"""
         return [a for a in arts if not a.get("date") or a["date"][:10] >= cutoff]
-    zenn_articles   = recent(zenn_articles)
+    # Zennはorder=dailyでトレンド取得済みなのでフィルタ不要
     qiita_articles  = recent(qiita_articles)
     hatena_articles = recent(hatena_articles)
     nikkei_articles = recent(nikkei_articles)
-    print(f"  14日フィルタ後 → Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
+    print(f"  日付フィルタ後 → Zenn: {len(zenn_articles)}(フィルタなし), Qiita: {len(qiita_articles)}, "
           f"はてな: {len(hatena_articles)}, 日経: {len(nikkei_articles)}")
 
     lines: list[str] = [
