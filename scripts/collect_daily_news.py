@@ -101,6 +101,7 @@ TAG_LABELS = {
     "poem":  ("ポエム", "tag-poem"),
     "eco":   ("経済",  "tag-eco"),
     "dev":   ("Dev",   "tag-dev"),
+    "blog":  ("Blog",  "tag-blog"),
     "other": ("Other", "tag-other"),
 }
 
@@ -435,6 +436,37 @@ def collect_hatena() -> list[dict]:
     return articles[:30]
 
 
+def collect_hatena_blog() -> list[dict]:
+    """はてなブログ注目記事: はてブ検索RSSでエンジニア系ブログ記事を収集"""
+    keywords = [
+        "エンジニア",
+        "プログラマ",
+        "技術ブログ",
+    ]
+    seen: set[str] = set()
+    articles: list[dict] = []
+
+    def fetch_keyword(kw: str) -> list[dict]:
+        encoded = urllib.parse.quote(kw)
+        url = f"https://b.hatena.ne.jp/q/{encoded}?date_range=1m&sort=hot&mode=rss&safe=on&target=entry&users=5"
+        r = get(url)
+        return parse_rss(r.content) if r else []
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        for items in ex.map(fetch_keyword, keywords):
+            for item in items:
+                if item["url"] not in seen:
+                    seen.add(item["url"])
+                    # 興味領域に合う記事のみ（ポエム・AI・ML・Dev）
+                    tag = classify_tag(item["title"], item["desc"])
+                    if tag in ("ai", "ml", "cv", "poem", "dev", "other"):
+                        item["tag"] = "blog"
+                        articles.append(item)
+
+    articles.sort(key=lambda a: a["meta"].get("bookmarks", 0), reverse=True)
+    return articles[:20]
+
+
 def collect_hn() -> list[dict]:
     """Algolia API + Google Translate でタイトルを日本語訳（当日のみ）"""
     # pts>=100 かつ直近24時間以内の記事のみ
@@ -515,6 +547,7 @@ CSS = """<style>
 .tag-poem { color: #c2185b; background: #fce4ec; }
 .tag-eco  { color: #00695c; background: #e0f2f1; }
 .tag-dev  { color: #558b2f; background: #f1f8e9; }
+.tag-blog { color: #5c6bc0; background: #e8eaf6; }
 .tag-other { color: #666; background: #f2f2f2; }
 .tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
 .tab-btn { padding: 6px 14px; border: none; border-radius: 20px; cursor: pointer;
@@ -534,6 +567,7 @@ TAB_NAV = """<div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('zenn',this)">Zenn</button>
   <button class="tab-btn" onclick="switchTab('qiita',this)">Qiita</button>
   <button class="tab-btn" onclick="switchTab('hatena',this)">はてな</button>
+  <button class="tab-btn" onclick="switchTab('blog',this)">Blog</button>
   <button class="tab-btn" onclick="switchTab('nikkei',this)">日経</button>
   <button class="tab-btn" onclick="switchTab('hn',this)">HN</button>
 </div>"""
@@ -625,17 +659,20 @@ def main():
         f_zenn   = ex.submit(collect_zenn)
         f_qiita  = ex.submit(collect_qiita)
         f_hatena = ex.submit(collect_hatena)
+        f_blog   = ex.submit(collect_hatena_blog)
         f_hn     = ex.submit(collect_hn)
         f_nikkei = ex.submit(collect_nikkei)
 
     zenn_articles   = f_zenn.result()
     qiita_articles  = f_qiita.result()
     hatena_articles = f_hatena.result()
+    blog_articles   = f_blog.result()
     hn_articles     = f_hn.result()
     nikkei_articles = f_nikkei.result()
 
     print(f"  Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, HN: {len(hn_articles)}, 日経: {len(nikkei_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, "
+          f"HN: {len(hn_articles)}, 日経: {len(nikkei_articles)}")
 
     # --- 日付フィルタ（Zennはトレンドなのでフィルタなし、他は14日）---
     cutoff = (now - timedelta(days=14)).strftime("%Y-%m-%d")
@@ -646,8 +683,9 @@ def main():
     qiita_articles  = recent(qiita_articles)
     hatena_articles = recent(hatena_articles)
     nikkei_articles = recent(nikkei_articles)
+    # blogは1ヶ月の検索RSSなのでフィルタ不要
     print(f"  日付フィルタ後 → Zenn: {len(zenn_articles)}(フィルタなし), Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, 日経: {len(nikkei_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, 日経: {len(nikkei_articles)}")
 
     # --- タブ間の重複排除（先のタブを優先、UTMパラメータ除去して比較）---
     global_seen: set[str] = set()
@@ -662,15 +700,17 @@ def main():
     zenn_articles   = dedup(zenn_articles)
     qiita_articles  = dedup(qiita_articles)
     hatena_articles = dedup(hatena_articles)
+    blog_articles   = dedup(blog_articles)
     nikkei_articles = dedup(nikkei_articles)
     hn_articles     = dedup(hn_articles)
     print(f"  重複排除後 → Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, 日経: {len(nikkei_articles)}, HN: {len(hn_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, "
+          f"日経: {len(nikkei_articles)}, HN: {len(hn_articles)}")
 
     lines: list[str] = [
         "---",
         "layout: post",
-        f'title: "{date_label}:Zenn・Qiita・はてブ・日経・HN"',
+        f'title: "{date_label}:Zenn・Qiita・はてブ・Blog・日経・HN"',
         f"date: {date_label} {time_label}:00 +0900",
         "categories: [daily]",
         "---",
@@ -686,6 +726,8 @@ def main():
     lines += render_standard(qiita_articles,  "qiita",  "👍",  "likes")
     lines += [""]
     lines += render_standard(hatena_articles, "hatena", "🔖", "bookmarks")
+    lines += [""]
+    lines += render_standard(blog_articles,   "blog",  "🔖", "bookmarks")
     lines += [""]
     lines += render_standard(nikkei_articles, "nikkei", "",   "")
     lines += [""]
