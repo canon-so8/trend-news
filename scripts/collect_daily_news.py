@@ -249,61 +249,54 @@ QIITA_TAGS = [
 
 
 def collect_zenn() -> list[dict]:
-    """Zenn API: topicごとに liked_count 付きで取得"""
+    """Zenn API: 最新順で取得してからいいね数でソート（3日フィルタを通るよう order=latest）"""
     seen: set[str] = set()
     articles: list[dict] = []
 
+    def _parse(a: dict) -> Optional[dict]:
+        slug = a.get("slug", "")
+        title = a.get("title", "")
+        if not title or not slug:
+            return None
+        return {
+            "title": title,
+            "url": f"https://zenn.dev{a.get('path', f'/articles/{slug}')}",
+            "date": (a.get("published_at") or "")[:10],
+            "desc": "",
+            "meta": {
+                "likes": a.get("liked_count", 0) or 0,
+                "author": (a.get("user") or {}).get("name", ""),
+            },
+        }
+
     def fetch_topic(topic: str) -> list[dict]:
-        url = f"https://zenn.dev/api/articles?topicname={topic}&order=liked_count&count=15"
+        url = f"https://zenn.dev/api/articles?topicname={topic}&order=latest&count=20"
         r = get(url)
         if not r:
             return []
-        result = []
-        for a in r.json().get("articles", []):
-            slug = a.get("slug", "")
-            art_url = f"https://zenn.dev{a.get('path', f'/articles/{slug}')}"
-            title = a.get("title", "")
-            pub = (a.get("published_at") or "")[:10]
-            likes = a.get("liked_count", 0) or 0
-            author = (a.get("user") or {}).get("name", "")
-            if title and slug:
-                result.append({
-                    "title": title, "url": art_url, "date": pub, "desc": "",
-                    "meta": {"likes": likes, "author": author},
-                })
-        return result
+        return [p for a in r.json().get("articles", []) if (p := _parse(a))]
 
-    # トップページ（全トレンド）
-    r = get("https://zenn.dev/api/articles?order=liked_count&count=20")
+    # トップページ（最新トレンド）
+    r = get("https://zenn.dev/api/articles?order=latest&count=30")
     if r:
         for a in r.json().get("articles", []):
-            slug = a.get("slug", "")
-            art_url = f"https://zenn.dev{a.get('path', f'/articles/{slug}')}"
-            if art_url not in seen and a.get("title"):
-                seen.add(art_url)
-                articles.append({
-                    "title": a["title"], "url": art_url,
-                    "date": (a.get("published_at") or "")[:10], "desc": "",
-                    "meta": {
-                        "likes": a.get("liked_count", 0) or 0,
-                        "author": (a.get("user") or {}).get("name", ""),
-                    },
-                })
+            p = _parse(a)
+            if p and p["url"] not in seen:
+                seen.add(p["url"])
+                articles.append(p)
 
     with ThreadPoolExecutor(max_workers=6) as ex:
         for items in ex.map(fetch_topic, ZENN_TOPICS):
             for item in items:
                 if item["url"] not in seen:
                     seen.add(item["url"])
-                    item["tag"] = classify_tag(item["title"])
                     articles.append(item)
 
-    # liked_count降順にソート
+    # いいね数降順でソート・タグ付け
     articles.sort(key=lambda a: a["meta"].get("likes", 0), reverse=True)
     for a in articles:
-        if "tag" not in a:
-            a["tag"] = classify_tag(a["title"])
-    return articles[:40]
+        a["tag"] = classify_tag(a["title"])
+    return articles[:50]
 
 
 def collect_qiita() -> list[dict]:
