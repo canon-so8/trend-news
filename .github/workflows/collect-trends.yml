@@ -1,0 +1,64 @@
+name: Collect Trends
+
+on:
+  workflow_dispatch:  # 手動実行のみ（スケジュールは未設定）
+
+# TODO: 定期実行を有効にする場合は以下を on: に追加
+#   schedule:
+#     - cron: "0 0 * * *"   # 毎朝 9:00 JST
+#     - cron: "0 12 * * *"  # 毎夕 21:00 JST
+
+# TODO: Slack通知を有効にする場合は SLACK_BOT_TOKEN を GitHub Secrets に登録して
+#       下部のコメントアウトを外す
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Collect HF Papers
+        run: python scripts/collect_hf_papers.py
+
+      - name: Collect Daily News
+        run: python scripts/collect_daily_news.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add _posts/
+          git diff --cached --quiet && echo "変更なし" || git commit -m "trend: $(date +'%Y-%m-%d %H:%M' -d '+9 hours')"
+          git push
+
+      # - name: Notify Slack
+      #   if: success()
+      #   env:
+      #     SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      #   run: |
+      #     python - <<'EOF'
+      #     import json, urllib.request, os
+      #     from datetime import datetime, timezone, timedelta
+      #     token = os.environ.get("SLACK_BOT_TOKEN", "")
+      #     now = datetime.now(timezone(timedelta(hours=9)))
+      #     date_str = now.strftime("%Y-%m-%d")
+      #     text = f"trend-news 更新完了 {date_str}\n<https://canon-so8.github.io/trend-news/|サイトを開く>"
+      #     data = json.dumps({"channel": "C0APSDG0WKX", "text": text}).encode("utf-8")
+      #     req = urllib.request.Request(
+      #         "https://slack.com/api/chat.postMessage",
+      #         data=data,
+      #         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+      #     )
+      #     print(json.loads(urllib.request.urlopen(req).read()).get("ok"))
+      #     EOF
