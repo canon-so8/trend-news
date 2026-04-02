@@ -51,8 +51,9 @@ CSS = """<style>
 .tab-btn.active { background: #333; color: #fff; }
 .paper { margin-bottom: 0; border-top: 1px solid rgba(128,128,128,0.35); padding-top: 1.2rem; margin-top: 0.8rem; }
 .paper:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-details summary { cursor: pointer; font-size: 0.78rem; color: #888; margin-top: 4px; }
-details p { font-size: 0.82rem; margin: 4px 0 0 12px; color: #555; }
+details { margin-top: 6px; }
+details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
+details p { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; color: #555; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -88,27 +89,29 @@ def assign_tags(paper: dict) -> list[str]:
 
 
 DEEPL_AUTH_KEY = os.environ.get("DEEPL_AUTH_KEY", "")
-
-
 DEEPL_API_URL = (
     "https://api-free.deepl.com/v2/translate"
     if DEEPL_AUTH_KEY.endswith(":fx")
     else "https://api.deepl.com/v2/translate"
 )
+deepl_chars_used = 0  # DeepL消費文字数カウンター
 
 
 def translate_deepl(text: str) -> str:
     """DeepL API で英語→日本語翻訳（Free/Pro自動判定）"""
+    global deepl_chars_used
     if not DEEPL_AUTH_KEY or not text:
         return ""
+    truncated = text[:1500]
     try:
         resp = requests.post(
             DEEPL_API_URL,
             headers={"Authorization": f"DeepL-Auth-Key {DEEPL_AUTH_KEY}"},
-            data={"text": text[:1500], "target_lang": "JA"},
+            data={"text": truncated, "target_lang": "JA"},
             timeout=15,
         )
         if resp.status_code == 200:
+            deepl_chars_used += len(truncated)
             return resp.json()["translations"][0]["text"]
         print(f"  DeepL HTTP {resp.status_code}: {resp.text[:200]}", file=sys.stderr)
     except Exception as e:
@@ -289,6 +292,8 @@ def main():
     out_path = OUTPUT_DIR / f"{timestamp}-neta-trend-hf.md"
     out_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"保存: {out_path}")
+    if deepl_chars_used:
+        print(f"  DeepL消費文字数: {deepl_chars_used:,} 文字")
 
     # Slack通知用URLをファイルに書き出す
     date_path = now.strftime("%Y/%m/%d")
