@@ -507,7 +507,7 @@ CSS = """<style>
 .item-meta { font-size: 0.78rem; color: #888; margin-top: 2px; }
 details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
-details p { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; color: #555; }
+details blockquote { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; padding: 8px 12px; color: #555; border-left: 3px solid #ddd; background: transparent; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -576,7 +576,7 @@ def render_hn(articles: list[dict]) -> list[str]:
             lines += [
                 "  <details>",
                 f'    <summary>タイトルの日本語訳</summary>',
-                f'    <p>{title_ja}</p>',
+                f'    <blockquote>{title_ja}</blockquote>',
                 "  </details>",
             ]
         lines.append("</div>")

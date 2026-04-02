@@ -53,7 +53,7 @@ CSS = """<style>
 .paper:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
-details p { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; color: #555; }
+details blockquote { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; padding: 8px 12px; color: #555; border-left: 3px solid #ddd; background: transparent; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -299,7 +299,7 @@ def main():
             detail_lines += [
                 '<details>',
                 '<summary>要約を読む</summary>',
-                f'<p>{summary_ja}</p>',
+                f'<blockquote>{summary_ja}</blockquote>',
                 '</details>',
             ]
         detail_lines += ["</div>", ""]
