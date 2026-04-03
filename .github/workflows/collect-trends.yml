@@ -76,7 +76,7 @@ jobs:
               exit(0)
 
           def post(text):
-              data = json.dumps({"channel": "C0AM20RBC4R", "text": text}).encode("utf-8")
+              data = json.dumps({"channel": "C0AQK8QDJ13", "text": text}).encode("utf-8")
               req = urllib.request.Request(
                   "https://slack.com/api/chat.postMessage",
                   data=data,
