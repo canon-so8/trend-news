@@ -634,23 +634,22 @@ def collect_hn() -> list[dict]:
 # --- Markdown ---
 CSS = """<style>
 .tag { font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
-.tag-agent { color: #2e7d32; background: #e8f5e9; }
-.tag-ai    { color: #bf5a00; background: #fff3e0; }
-.tag-git   { color: #37474f; background: #eceff1; }
-.tag-pkg   { color: #b71c1c; background: #ffebee; }
-.tag-research { color: #1565c0; background: #e3f2fd; }
-.tag-sec   { color: #d32f2f; background: #ffebee; }
-.tag-front { color: #0097a7; background: #e0f7fa; }
-.tag-back  { color: #5d4037; background: #efebe9; }
-.tag-cloud { color: #0277bd; background: #e1f5fe; }
-.tag-lang  { color: #4527a0; background: #ede7f6; }
-.tag-oss   { color: #2e7d32; background: #e8f5e9; }
-.tag-ml   { color: #6a1b9a; background: #f3e5f5; }
-.tag-cv   { color: #1a6bbf; background: #e8f0fb; }
-.tag-poem { color: #c2185b; background: #fce4ec; }
-.tag-eco  { color: #00695c; background: #e0f2f1; }
-.tag-dev  { color: #558b2f; background: #f1f8e9; }
-.tag-other { color: #666; background: #f2f2f2; }
+.tag-agent { color: #fff; background: #00c853; }
+.tag-ai    { color: #fff; background: #ff6d00; }
+.tag-ml    { color: #fff; background: #aa00ff; }
+.tag-cv    { color: #fff; background: #2979ff; }
+.tag-research { color: #fff; background: #304ffe; }
+.tag-sec   { color: #fff; background: #ff1744; }
+.tag-poem  { color: #fff; background: #ff4081; }
+.tag-eco   { color: #333; background: #ffd600; }
+.tag-front { color: #fff; background: #00bcd4; }
+.tag-back  { color: #fff; background: #8d6e63; }
+.tag-cloud { color: #fff; background: #0091ea; }
+.tag-lang  { color: #fff; background: #d500f9; }
+.tag-git   { color: #fff; background: #546e7a; }
+.tag-pkg   { color: #fff; background: #f50057; }
+.tag-oss   { color: #333; background: #76ff03; }
+.tag-dev   { color: #fff; background: #00bfa5; }
 .tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .tab-btn { padding: 6px 14px; border: none; border-radius: 20px; cursor: pointer;
   font-size: 0.85rem; font-weight: 700; background: #e8e8e8; color: #444; transition: background 0.15s; }
