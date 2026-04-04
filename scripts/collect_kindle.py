@@ -25,7 +25,7 @@ CSS = """<style>
 .kindle-card { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: box-shadow .2s; }
 .kindle-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
 .kindle-card a { text-decoration: none; color: inherit; display: block; }
-.kindle-cover { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: #f5f5f5; display: block; }
+.kindle-cover { width: 100%; height: auto; display: block; }
 .kindle-cover-placeholder { width: 100%; aspect-ratio: 2/3; background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 0.7rem; }
 .kindle-info { padding: 8px; }
 .kindle-title { font-size: 0.78rem; font-weight: 700; line-height: 1.3; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
