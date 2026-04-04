@@ -38,22 +38,27 @@ jobs:
 
       - name: Install dependencies
         if: steps.holiday.outputs.skip != 'true'
-        run: pip install requests
+        run: pip install requests beautifulsoup4 lxml
 
       - name: Collect HF Papers
         if: steps.holiday.outputs.skip != 'true'
         env:
           DEEPL_AUTH_KEY: ${{ secrets.DEEPL_AUTH_KEY }}
-          DEEPL_ENABLED: "true"
+          DEEPL_ENABLED: ${{ vars.DEEPL_ENABLED }}
         run: python scripts/collect_hf_papers.py
 
       - name: Collect Daily News
         if: steps.holiday.outputs.skip != 'true'
         env:
           DEEPL_AUTH_KEY: ${{ secrets.DEEPL_AUTH_KEY }}
-          DEEPL_ENABLED: "true"
+          DEEPL_ENABLED: ${{ vars.DEEPL_ENABLED }}
           QIITA_TOKEN: ${{ secrets.QIITA_TOKEN }}
         run: python scripts/collect_daily_news.py
+
+      - name: Collect Kindle Sales
+        if: steps.holiday.outputs.skip != 'true'
+        continue-on-error: true
+        run: python scripts/collect_kindle.py
 
       - name: Commit and push
         if: steps.holiday.outputs.skip != 'true'
@@ -109,8 +114,9 @@ jobs:
           now = datetime.now(timezone(timedelta(hours=9)))
           date_str = now.strftime("%Y-%m-%d")
 
-          daily_url = Path("/tmp/daily_url.txt").read_text().strip() if Path("/tmp/daily_url.txt").exists() else ""
-          hf_url    = Path("/tmp/hf_url.txt").read_text().strip()    if Path("/tmp/hf_url.txt").exists()    else ""
+          daily_url  = Path("/tmp/daily_url.txt").read_text().strip()  if Path("/tmp/daily_url.txt").exists()  else ""
+          hf_url     = Path("/tmp/hf_url.txt").read_text().strip()     if Path("/tmp/hf_url.txt").exists()     else ""
+          kindle_url = Path("/tmp/kindle_url.txt").read_text().strip() if Path("/tmp/kindle_url.txt").exists() else ""
 
           if daily_url:
               wait_for_url(daily_url, "ニュース")
@@ -118,4 +124,7 @@ jobs:
           if hf_url:
               wait_for_url(hf_url, "トレンド論文")
               post(f"<{hf_url}|{date_str} : トレンド論文>")
+          if kindle_url:
+              wait_for_url(kindle_url, "Kindleセール")
+              post(f"<{kindle_url}|{date_str} : Kindle 日替わりセール>")
           EOF
