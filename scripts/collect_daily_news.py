@@ -7,8 +7,9 @@ Claude Code 不要 - RSS/API から直接データ取得してJekyll Markdownを
   - Zenn   : API (liked_count付き)
   - Qiita  : API v2 (likes_count付き)
   - はてな  : RSS/RDF (bookmarkcount付き)
-  - HN     : Algolia API + Google Translate（タイトル日本語訳）
-  - xTech  : RSS 1.0/RDF
+  - HN     : Algolia API + DeepL（タイトル日本語訳）
+
+※ 商用メディア（ITmedia・東洋経済等）はSlack配信の利用規約リスクのため除外
 """
 import json
 import os
@@ -166,6 +167,19 @@ def _text(el) -> str:
     return (el.text or "").strip() if el is not None else ""
 
 
+def _parse_date(raw: str) -> str:
+    """RSS 2.0 の pubDate (RFC 2822) や ISO 日付を YYYY-MM-DD に正規化"""
+    if not raw:
+        return ""
+    if re.match(r'\d{4}-\d{2}-\d{2}', raw):
+        return raw[:10]
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(raw).strftime("%Y-%m-%d")
+    except Exception:
+        return raw[:10]
+
+
 def parse_rss(data: bytes) -> list[dict]:
     """RSS 1.0(RDF) / RSS 2.0 / Atom を解析。
     はてブRDFの場合は hatena:bookmarkcount も返す。"""
@@ -223,7 +237,7 @@ def parse_rss(data: bytes) -> list[dict]:
         url    = _text(item.find("link"))
         _pd    = item.find("pubDate")
         pub_el = _pd if _pd is not None else item.find(f"{{{DC}}}date")
-        pub    = _text(pub_el)[:16]
+        pub    = _parse_date(_text(pub_el))
         desc   = _text(item.find("description"))
         if title and url:
             items.append({"title": title, "url": url, "date": pub, "desc": desc, "meta": {}})
@@ -505,30 +519,6 @@ def collect_hn() -> list[dict]:
     return articles
 
 
-def collect_nikkei() -> list[dict]:
-    """日経xTech + 日経テクノロジー RSS（直近3日）"""
-    cutoff = (datetime.now(JST) - timedelta(days=3)).strftime("%Y-%m-%d")
-    urls = [
-        "https://xtech.nikkei.com/rss/index.rdf",
-    ]
-    seen: set[str] = set()
-    articles: list[dict] = []
-    for url in urls:
-        r = get(url)
-        if not r:
-            continue
-        for item in parse_rss(r.content):
-            if item["url"] not in seen:
-                seen.add(item["url"])
-                # 直近3日の記事のみ（日付なしは含める）
-                if item.get("date") and item["date"][:10] < cutoff:
-                    continue
-                tag = classify_tag(item["title"], item["desc"])
-                if tag in ("ai", "ml", "cv", "eco", "dev"):
-                    item["tag"] = tag
-                    articles.append(item)
-    return articles[:20]
-
 
 # --- Markdown ---
 CSS = """<style>
@@ -564,7 +554,6 @@ TAB_NAV = """<div class="tab-nav">
   <button class="tab-btn" onclick="switchTab('qiita',this)">Qiita</button>
   <button class="tab-btn" onclick="switchTab('hatena',this)">はてな</button>
   <button class="tab-btn" onclick="switchTab('blog',this)">Blog</button>
-  <button class="tab-btn" onclick="switchTab('nikkei',this)">日経</button>
   <button class="tab-btn" onclick="switchTab('hn',this)">HN</button>
 </div>
 <div class="sort-bar">
@@ -686,18 +675,15 @@ def main():
         f_hatena = ex.submit(collect_hatena)
         f_blog   = ex.submit(collect_hatena_blog)
         f_hn     = ex.submit(collect_hn)
-        f_nikkei = ex.submit(collect_nikkei)
 
     zenn_articles   = f_zenn.result()
     qiita_articles  = f_qiita.result()
     hatena_articles = f_hatena.result()
     blog_articles   = f_blog.result()
     hn_articles     = f_hn.result()
-    nikkei_articles = f_nikkei.result()
 
     print(f"  Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, "
-          f"HN: {len(hn_articles)}, 日経: {len(nikkei_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, HN: {len(hn_articles)}")
 
     # --- 日付フィルタ（Zennはトレンドなのでフィルタなし、他は14日）---
     cutoff = (now - timedelta(days=14)).strftime("%Y-%m-%d")
@@ -707,10 +693,9 @@ def main():
     # Zennはorder=weeklyでその日のトレンド取得済みなのでフィルタ不要
     qiita_articles  = recent(qiita_articles)
     hatena_articles = recent(hatena_articles)
-    nikkei_articles = recent(nikkei_articles)
     # blogは1ヶ月の検索RSSなのでフィルタ不要
     print(f"  日付フィルタ後 → Zenn: {len(zenn_articles)}(フィルタなし), Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, 日経: {len(nikkei_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}")
 
     # --- タブ間の重複排除（先のタブを優先、UTMパラメータ除去して比較）---
     global_seen: set[str] = set()
@@ -726,11 +711,9 @@ def main():
     qiita_articles  = dedup(qiita_articles)
     hatena_articles = dedup(hatena_articles)
     blog_articles   = dedup(blog_articles)
-    nikkei_articles = dedup(nikkei_articles)
     hn_articles     = dedup(hn_articles)
     print(f"  重複排除後 → Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, "
-          f"日経: {len(nikkei_articles)}, HN: {len(hn_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, HN: {len(hn_articles)}")
 
     lines: list[str] = [
         "---",
@@ -753,8 +736,6 @@ def main():
     lines += render_standard(hatena_articles, "hatena", "🔖", "bookmarks")
     lines += [""]
     lines += render_standard(blog_articles,   "blog",  "🔖", "bookmarks")
-    lines += [""]
-    lines += render_standard(nikkei_articles, "nikkei", "",   "")
     lines += [""]
     lines += render_hn(hn_articles)
     lines += ["", SWITCH_JS, ""]
