@@ -557,9 +557,9 @@ details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
 details blockquote { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; padding: 8px 12px; color: #555; border-left: 3px solid #ddd; background: transparent; }
 .kindle-footer { margin-top: 2rem; padding: 1rem 0; border-top: 1px solid #eee; }
-.kindle-btn { display: inline-block; padding: 6px 18px; background: #222; color: #fff;
-  font-size: 0.85rem; font-weight: 700; border-radius: 4px; text-decoration: none; }
-.kindle-btn:hover { background: #444; }
+.kindle-btn { display: inline-block; padding: 6px 18px; background: #fff; color: #ff9900;
+  border: 2px solid #ff9900; font-size: 0.85rem; font-weight: 700; border-radius: 4px; text-decoration: none; }
+.kindle-btn:hover { background: #fff8f0; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
