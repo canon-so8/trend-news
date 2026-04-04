@@ -281,7 +281,7 @@ QIITA_TAGS = [
 
 
 def collect_zenn() -> list[dict]:
-    """Zenn API: デイリートレンドで取得してからいいね数でソート"""
+    """Zenn API: ウィークリートレンドで取得してからいいね数でソート"""
     seen: set[str] = set()
     articles: list[dict] = []
 
@@ -302,7 +302,7 @@ def collect_zenn() -> list[dict]:
         }
 
     def fetch_topic(topic: str) -> list[dict]:
-        url = f"https://zenn.dev/api/articles?topicname={topic}&order=daily&count=20"
+        url = f"https://zenn.dev/api/articles?topicname={topic}&order=weekly&count=20"
         r = get(url)
         if not r:
             return []
@@ -310,7 +310,7 @@ def collect_zenn() -> list[dict]:
 
     # Techs + Ideas（デイリートレンド）
     for atype in ("tech", "idea"):
-        r = get(f"https://zenn.dev/api/articles?order=daily&count=50&article_type={atype}")
+        r = get(f"https://zenn.dev/api/articles?order=weekly&count=50&article_type={atype}")
         if r:
             for a in r.json().get("articles", []):
                 p = _parse(a)
@@ -542,10 +542,15 @@ CSS = """<style>
 .tag-dev  { color: #558b2f; background: #f1f8e9; }
 .tag-blog { color: #5c6bc0; background: #e8eaf6; }
 .tag-other { color: #666; background: #f2f2f2; }
-.tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .tab-btn { padding: 6px 14px; border: none; border-radius: 20px; cursor: pointer;
   font-size: 0.85rem; font-weight: 700; background: #e8e8e8; color: #444; transition: background 0.15s; }
 .tab-btn.active { background: #333; color: #fff; }
+.sort-bar { display: flex; gap: 5px; align-items: center; margin-bottom: 1rem; }
+.sort-bar span { font-size: 0.75rem; color: #aaa; }
+.sort-btn { padding: 3px 11px; border: 1px solid #ccc; border-radius: 20px; cursor: pointer;
+  font-size: 0.75rem; font-weight: 700; background: #fff; color: #666; transition: all 0.15s; }
+.sort-btn.active { background: #333; color: #fff; border-color: #333; }
 .tab-pane { display: none; }
 .tab-pane.active { display: block; }
 .item { padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -563,14 +568,40 @@ TAB_NAV = """<div class="tab-nav">
   <button class="tab-btn" onclick="switchTab('blog',this)">Blog</button>
   <button class="tab-btn" onclick="switchTab('nikkei',this)">日経</button>
   <button class="tab-btn" onclick="switchTab('hn',this)">HN</button>
+</div>
+<div class="sort-bar">
+  <span>並び順:</span>
+  <button class="sort-btn active" onclick="setSort('latest',this)">Latest</button>
+  <button class="sort-btn" onclick="setSort('hotness',this)">Hotness</button>
 </div>"""
 
 SWITCH_JS = """<script>
+let _sort = 'latest';
+
+function sortPane(pane, mode) {
+  const items = Array.from(pane.querySelectorAll('.item'));
+  items.sort((a, b) => mode === 'latest'
+    ? (b.dataset.date || '').localeCompare(a.dataset.date || '')
+    : parseInt(b.dataset.count || '0') - parseInt(a.dataset.count || '0')
+  );
+  items.forEach(item => pane.appendChild(item));
+}
+
+function setSort(mode, btn) {
+  _sort = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const active = document.querySelector('.tab-pane.active');
+  if (active) sortPane(active, mode);
+}
+
 function switchTab(id, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
+  const pane = document.getElementById('tab-' + id);
+  pane.classList.add('active');
   btn.classList.add('active');
+  sortPane(pane, _sort);
 }
 </script>"""
 
@@ -590,8 +621,10 @@ def esc(s: str) -> str:
 
 def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_key: str) -> list[str]:
     active = " active" if tab_id == "zenn" else ""
+    # デフォルト: 最新順
+    sorted_articles = sorted(articles, key=lambda a: a.get("date", ""), reverse=True)
     lines = [f'<div id="tab-{tab_id}" class="tab-pane{active}">']
-    for a in articles:
+    for a in sorted_articles:
         title  = esc(a["title"])
         url    = a["url"]
         date   = a.get("date", "")[5:10]
@@ -602,7 +635,7 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
         author_str = f"@{author}" if author else ""
         meta_parts = [p for p in [date, count_str, author_str] if p] + [ts]
         lines += [
-            '<div class="item">',
+            f'<div class="item" data-date="{a.get("date","")}" data-count="{count}">',
             f'  <div class="item-title"><a href="{url}">{title}</a></div>',
             f'  <div class="item-meta">{" &nbsp; ".join(meta_parts)}</div>',
             "</div>",
@@ -612,8 +645,10 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
 
 
 def render_hn(articles: list[dict]) -> list[str]:
+    # デフォルト: 最新順
+    sorted_articles = sorted(articles, key=lambda a: a.get("date", ""), reverse=True)
     lines = ['<div id="tab-hn" class="tab-pane">']
-    for a in articles:
+    for a in sorted_articles:
         title    = esc(a["title"])
         title_ja = esc(a["meta"].get("title_ja", ""))
         url      = a["url"]
@@ -624,7 +659,7 @@ def render_hn(articles: list[dict]) -> list[str]:
         ts       = tag_span(a.get("tag", "other"))
         meta_parts = [p for p in [date, f"🔥 {pts}" if pts else "", f"💬 {cmts}" if cmts else ""] if p] + [ts]
         lines += [
-            '<div class="item">',
+            f'<div class="item" data-date="{a.get("date","")}" data-count="{pts}">',
             f'  <div class="item-title"><a href="{url}">{title}</a></div>',
             f'  <div class="item-meta">{" &nbsp; ".join(meta_parts)}</div>',
         ]
@@ -672,7 +707,7 @@ def main():
     def recent(arts: list[dict]) -> list[dict]:
         """date が cutoff 以降の記事のみ残す。日付なし記事は保持。"""
         return [a for a in arts if not a.get("date") or a["date"][:10] >= cutoff]
-    # Zennはorder=dailyでその日のトレンド取得済みなのでフィルタ不要
+    # Zennはorder=weeklyでその日のトレンド取得済みなのでフィルタ不要
     qiita_articles  = recent(qiita_articles)
     hatena_articles = recent(hatena_articles)
     nikkei_articles = recent(nikkei_articles)
