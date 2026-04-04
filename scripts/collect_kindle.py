@@ -4,9 +4,7 @@ Kindle 日替わりセール本 収集スクリプト
 sale-bon.com/daily_sale/ から個別書籍を取得し、
 yapi.ta2o.net/kndlsl/ からセールキャンペーン一覧を補足してJekyll Markdownを生成
 """
-import re
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -20,7 +18,6 @@ REPO_ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = REPO_ROOT / "_posts" / "kindle"
 
 SALE_BON_URL = "https://sale-bon.com/daily_sale/"
-YAPI_URL = "https://yapi.ta2o.net/kndlsl/"
 
 CSS = """<style>
 .kindle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin: 1.2rem 0; }
@@ -38,8 +35,6 @@ CSS = """<style>
 .sale-campaign a { color: #c07000; font-weight: 700; }
 .sale-campaign .sale-meta { font-size: 0.75rem; color: #888; margin-top: 3px; }
 .tag { font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
-.tag-sale { color: #c0392b; background: #fdecea; }
-.tag-point { color: #d07000; background: #fff3e0; }
 </style>"""
 
 
@@ -140,75 +135,9 @@ def fetch_sale_bon_books() -> list[dict]:
     return books
 
 
-# ---------- yapi.ta2o.net: セールキャンペーン ----------
-
-def fetch_yapi_campaigns() -> list[dict]:
-    """yapi.ta2o.net/kndlsl/ から現在のKindleセールキャンペーン一覧を取得"""
-    html = fetch_html(YAPI_URL)
-    if not html:
-        return []
-
-    soup = BeautifulSoup(html, "lxml")
-    campaigns = []
-
-    for container in soup.select("div.sale-container"):
-        try:
-            # セールタイトル
-            title_el = container.select_one("div.item-sale-title > a")
-            if not title_el:
-                continue
-            sale_title = title_el.get_text(strip=True)
-            sale_link = title_el.get("href", "")
-            if sale_link and not sale_link.startswith("http"):
-                sale_link = "https://yapi.ta2o.net" + sale_link
-
-            # 期間
-            period_el = container.select_one("span.item-sale-timeframe")
-            period = period_el.get_text(strip=True) if period_el else ""
-
-            # ジャンル・出版社
-            genre_el = container.select_one("span.genre-display")
-            genre = genre_el.get_text(strip=True) if genre_el else ""
-
-            pub_el = container.select_one("span.publi-display")
-            publisher = pub_el.get_text(strip=True) if pub_el else ""
-
-            # 冊数
-            num_el = container.select_one("span.number-display")
-            item_num = num_el.get_text(strip=True) if num_el else ""
-
-            # 終了ラベル（「明日終了」「本日終了」など）
-            end_el = container.select_one("span.sale-end")
-            end_label = end_el.get_text(strip=True) if end_el else ""
-
-            # ポイント還元などキャッチコピーを title から抽出
-            point_match = re.search(r'(\d+%ポイント還元|\d+%OFF|\d+%off)', sale_title)
-            discount_label = point_match.group(1) if point_match else ""
-
-            campaigns.append({
-                "title": sale_title,
-                "link": sale_link,
-                "period": period,
-                "genre": genre,
-                "publisher": publisher,
-                "item_num": item_num,
-                "end_label": end_label,
-                "discount_label": discount_label,
-            })
-        except Exception as e:
-            print(f"  キャンペーンパース失敗: {e}", file=sys.stderr)
-
-    # 「明日終了」「本日終了」を先頭にソート（urgency）
-    priority = {"本日終了": 0, "明日終了": 1}
-    campaigns.sort(key=lambda c: priority.get(c["end_label"], 9))
-
-    print(f"  yapi.ta2o.net: {len(campaigns)} 件")
-    return campaigns
-
-
 # ---------- Markdown 生成 ----------
 
-def build_markdown(books: list[dict], campaigns: list[dict], now: datetime) -> str:
+def build_markdown(books: list[dict], now: datetime) -> str:
     date_label = now.strftime("%Y-%m-%d")
     time_label = now.strftime("%H:%M")
 
@@ -266,41 +195,6 @@ def build_markdown(books: list[dict], campaigns: list[dict], now: datetime) -> s
             "",
         ]
 
-    # --- 現在開催中のセールキャンペーン ---
-    if campaigns:
-        lines += [
-            f'<p class="section-title">現在開催中のKindleセール（{len(campaigns)}件）</p>',
-            "",
-        ]
-        for c in campaigns[:20]:  # 上位20件まで表示
-            tag_html = ""
-            if c["discount_label"]:
-                tag_cls = "tag-point" if "ポイント" in c["discount_label"] else "tag-sale"
-                tag_html = f' <span class="tag {tag_cls}">{c["discount_label"]}</span>'
-            end_html = (
-                f' <span class="tag tag-sale">{c["end_label"]}</span>'
-                if c["end_label"] else ""
-            )
-            meta_parts = []
-            if c["genre"]:
-                meta_parts.append(c["genre"])
-            if c["publisher"]:
-                meta_parts.append(c["publisher"])
-            if c["item_num"]:
-                meta_parts.append(f'{c["item_num"]}冊')
-            if c["period"]:
-                meta_parts.append(c["period"])
-            meta_html = " · ".join(meta_parts)
-
-            lines += [
-                f'<div class="sale-campaign">',
-                f'  <a href="{c["link"]}" target="_blank" rel="noopener">{c["title"]}</a>',
-                f'  {tag_html}{end_html}',
-                f'  <div class="sale-meta">{meta_html}</div>',
-                f'</div>',
-            ]
-        lines += [""]
-
     return "\n".join(lines)
 
 
@@ -312,17 +206,12 @@ def main():
     print("sale-bon.com から日替わりセール書籍を取得...")
     books = fetch_sale_bon_books()
 
-    time.sleep(1)
-
-    print("yapi.ta2o.net からセールキャンペーンを取得...")
-    campaigns = fetch_yapi_campaigns()
-
-    if not books and not campaigns:
+    if not books:
         print("データ取得失敗。終了します。", file=sys.stderr)
         sys.exit(1)
 
     # Markdown 生成・保存
-    content = build_markdown(books, campaigns, now)
+    content = build_markdown(books, now)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = now.strftime("%Y-%m-%d-%H-%M")
     out_path = OUTPUT_DIR / f"{timestamp}-kindle-sale.md"
