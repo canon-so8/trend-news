@@ -94,7 +94,7 @@ DEEPL_API_BASE = (
     if DEEPL_AUTH_KEY.endswith(":fx")
     else "https://api.deepl.com"
 )
-DEEPL_MONTHLY_LIMIT = 450_000  # この文字数を超えたらGoogle Translateにフォールバック
+DEEPL_MONTHLY_LIMIT = 450_000  # この文字数を超えたら翻訳スキップ
 deepl_chars_used = 0  # 今回の実行での消費文字数
 
 
@@ -217,13 +217,12 @@ def main():
     for p in filtered:
         p["tags"] = assign_tags(p)
 
-    # DeepL/Google Translateでアブスト翻訳
+    # DeepLでアブスト翻訳
     if DEEPL_AUTH_KEY and DEEPL_ENABLED:
         monthly = _deepl_monthly_usage()
         print(f"  DeepL月間使用量: {monthly:,}/{DEEPL_MONTHLY_LIMIT:,} 文字")
         if monthly >= DEEPL_MONTHLY_LIMIT:
-            print(f"  ⚠ 月間閾値超過 → Google Translateにフォールバック")
-            # DEEPL_ENABLEDを無効化してフォールバック
+            print(f"  ⚠ 月間閾値超過 → 翻訳スキップ")
             globals()["DEEPL_ENABLED"] = False
         else:
             endpoint = "api-free" if DEEPL_AUTH_KEY.endswith(":fx") else "api (Pro)"

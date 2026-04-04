@@ -31,6 +31,15 @@ JST = timezone(timedelta(hours=9))
 REPO_ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = REPO_ROOT / "_posts" / "daily_news"
 
+KINDLE_DAILY_URL = (
+    "https://www.amazon.co.jp/kindle-dbs/browse/"
+    "?_encoding=UTF8"
+    "&metadata=storeType%3Debooks"
+    "&widgetId=ebooks-deals-storefront_KindleDailyDealsStrategy"
+    "&title=Kindle%E6%97%A5%E6%9B%BF%E3%82%8F%E3%82%8A%E3%82%BB%E3%83%BC%E3%83%AB"
+    "&sourceType=recs"
+)
+
 # RSS 名前空間
 RSS1   = "http://purl.org/rss/1.0/"
 DC     = "http://purl.org/dc/elements/1.1/"
@@ -475,7 +484,7 @@ def collect_hatena_blog() -> list[dict]:
 
 
 def collect_hn() -> list[dict]:
-    """Algolia API + Google Translate でタイトルを日本語訳（当日のみ）"""
+    """Algolia API でHacker Newsの記事を収集（当日のみ）"""
     # pts>=100 かつ直近24時間以内の記事のみ
     since_ts = int((datetime.now(timezone.utc) - timedelta(days=1)).timestamp())
     url = (
@@ -547,6 +556,9 @@ CSS = """<style>
 details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
 details blockquote { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; padding: 8px 12px; color: #555; border-left: 3px solid #ddd; background: transparent; }
+.kindle-footer { margin-top: 2rem; padding: 0.8rem 0; border-top: 1px solid #eee; font-size: 0.88rem; color: #888; }
+.kindle-footer a { color: #c07000; text-decoration: none; }
+.kindle-footer a:hover { text-decoration: underline; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -738,7 +750,13 @@ def main():
     lines += render_standard(blog_articles,   "blog",  "🔖", "bookmarks")
     lines += [""]
     lines += render_hn(hn_articles)
-    lines += ["", SWITCH_JS, ""]
+    lines += [
+        "",
+        f'<div class="kindle-footer"><a href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">📚 Kindle 日替わりセール</a></div>',
+        "",
+        SWITCH_JS,
+        "",
+    ]
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / f"{timestamp}-neta-trend.md"
