@@ -142,36 +142,83 @@ LANG_KEYWORDS = [
     "java ", "kotlin", "swift", "c++", "c#", "ruby", "elixir", "zig",
     "haskell", "scala", "dart", "lua", "perl", "r言語",
 ]
+FRONT_KEYWORDS = [
+    "react", "vue", "svelte", "next.js", "nuxt", "angular", "astro",
+    "フロントエンド", "frontend", "css", "html", "tailwind", "sass",
+    "レスポンシブ", "responsive", "spa ", "ssr ", "dom ", "webcomponent",
+    "ui/ux", "デザインシステム", "コンポーネント", "storybook",
+    "ブラウザ", "browser", "web api", "webassembly", "wasm",
+]
+BACK_KEYWORDS  = [
+    "バックエンド", "backend", "サーバーサイド", "server-side",
+    "データベース", "sql", "postgresql", "mysql", "redis", "mongodb",
+    "api設計", "rest api", "restapi", "graphql", "grpc",
+    "orm ", "migration", "テーブル設計", "スキーマ設計",
+    "マイグレーション", "全文検索", "elasticsearch",
+    "nginx", "apache", "express", "fastapi", "django", "rails",
+]
+RESEARCH_KEYWORDS = [
+    "論文", "paper", "arxiv", "研究", "research",
+    "学会", "conference", "icml", "neurips", "iclr", "cvpr", "aaai",
+    "サーベイ", "survey", "ベンチマーク", "benchmark",
+    "実験", "experiment", "提案手法", "先行研究", "state-of-the-art", "sota",
+]
+OSS_KEYWORDS   = [
+    "oss", "オープンソース", "open source", "open-source",
+    "コントリビュート", "contribute", "プルリクエスト",
+    "license", "ライセンス", "mit license", "apache license",
+    "公開しました", "リリースしました", "作りました",
+    "自作", "個人開発", "趣味開発",
+]
 DEV_KEYWORDS  = [
     "linux", "cli", "sdk", "vscode",
     "ios開発", "android開発", "アプリ開発", "ios向け",
     "プログラミング", "コーディング", "ライブラリ", "フレームワーク",
-    "データベース", "sql", "postgresql", "redis", "mongodb",
     "バグ", "テスト", "ci/cd", "コマンドライン", "ターミナル", "シェルスクリプト",
-    "bash ", "zsh", "makefile", "api設計",
-    "全文検索", "uuid", "スキーマ", "orm ", "migration", "パフォーマンス",
+    "bash ", "zsh", "makefile",
+    "uuid", "スキーマ", "パフォーマンス",
     "リファクタリング", "コードレビュー", "開発環境", "wsl",
-    "ログ設計", "ログ収集", "監視", "オブザーバビリティ", "rest api", "restapi",
-    "テーブル設計", "スキーマ設計", "hostsファイル",
+    "ログ設計", "ログ収集", "監視", "オブザーバビリティ",
+    "hostsファイル",
 ]
 
-
-
+TAG_LABELS = {
+    "agent":    ("Agent",        "tag-agent"),
+    "ai":       ("AI",           "tag-ai"),
+    "ml":       ("機械学習",      "tag-ml"),
+    "cv":       ("画像",         "tag-cv"),
+    "research": ("研究",         "tag-research"),
+    "sec":      ("セキュリティ",   "tag-sec"),
+    "poem":     ("ポエム",        "tag-poem"),
+    "eco":      ("経済",         "tag-eco"),
+    "front":    ("フロントエンド", "tag-front"),
+    "back":     ("バックエンド",   "tag-back"),
+    "cloud":    ("クラウド",      "tag-cloud"),
+    "lang":     ("言語",         "tag-lang"),
+    "git":      ("Git",          "tag-git"),
+    "pkg":      ("パッケージ",     "tag-pkg"),
+    "oss":      ("OSS",          "tag-oss"),
+    "dev":      ("開発",         "tag-dev"),
+}
 
 
 _TAG_RULES: list[tuple[str, list[str]]] = [
-    ("agent", AGENT_KEYWORDS),
-    ("ai",    AI_KEYWORDS),
-    ("ml",    ML_KEYWORDS),
-    ("cv",    CV_KEYWORDS),
-    ("sec",   SEC_KEYWORDS),
-    ("poem",  POEM_KEYWORDS),
-    ("eco",   ECO_KEYWORDS),
-    ("cloud", CLOUD_KEYWORDS),
-    ("lang",  LANG_KEYWORDS),
-    ("git",   GIT_KEYWORDS),
-    ("pkg",   PKG_KEYWORDS),
-    ("dev",   DEV_KEYWORDS),
+    ("agent",    AGENT_KEYWORDS),
+    ("ai",       AI_KEYWORDS),
+    ("ml",       ML_KEYWORDS),
+    ("cv",       CV_KEYWORDS),
+    ("research", RESEARCH_KEYWORDS),
+    ("sec",      SEC_KEYWORDS),
+    ("poem",     POEM_KEYWORDS),
+    ("eco",      ECO_KEYWORDS),
+    ("front",    FRONT_KEYWORDS),
+    ("back",     BACK_KEYWORDS),
+    ("cloud",    CLOUD_KEYWORDS),
+    ("lang",     LANG_KEYWORDS),
+    ("git",      GIT_KEYWORDS),
+    ("pkg",      PKG_KEYWORDS),
+    ("oss",      OSS_KEYWORDS),
+    ("dev",      DEV_KEYWORDS),
 ]
 
 
@@ -588,9 +635,13 @@ CSS = """<style>
 .tag-ai    { color: #bf5a00; background: #fff3e0; }
 .tag-git   { color: #37474f; background: #eceff1; }
 .tag-pkg   { color: #b71c1c; background: #ffebee; }
+.tag-research { color: #1565c0; background: #e3f2fd; }
 .tag-sec   { color: #d32f2f; background: #ffebee; }
+.tag-front { color: #0097a7; background: #e0f7fa; }
+.tag-back  { color: #5d4037; background: #efebe9; }
 .tag-cloud { color: #0277bd; background: #e1f5fe; }
 .tag-lang  { color: #4527a0; background: #ede7f6; }
+.tag-oss   { color: #2e7d32; background: #e8f5e9; }
 .tag-ml   { color: #6a1b9a; background: #f3e5f5; }
 .tag-cv   { color: #1a6bbf; background: #e8f0fb; }
 .tag-poem { color: #c2185b; background: #fce4ec; }
