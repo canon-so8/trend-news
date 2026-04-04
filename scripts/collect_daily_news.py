@@ -556,9 +556,10 @@ CSS = """<style>
 details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
 details blockquote { font-size: 0.85rem; line-height: 1.6; margin: 8px 0 0 0; padding: 8px 12px; color: #555; border-left: 3px solid #ddd; background: transparent; }
-.kindle-footer { margin-top: 2rem; padding: 0.8rem 0; border-top: 1px solid #eee; font-size: 0.88rem; color: #888; }
-.kindle-footer a { color: #c07000; text-decoration: none; }
-.kindle-footer a:hover { text-decoration: underline; }
+.kindle-footer { margin-top: 2rem; padding: 1rem 0; border-top: 1px solid #eee; }
+.kindle-btn { display: inline-block; padding: 6px 18px; background: #222; color: #fff;
+  font-size: 0.85rem; font-weight: 700; border-radius: 4px; text-decoration: none; }
+.kindle-btn:hover { background: #444; }
 </style>"""
 
 TAB_NAV = """<div class="tab-nav">
@@ -752,7 +753,7 @@ def main():
     lines += render_hn(hn_articles)
     lines += [
         "",
-        f'<div class="kindle-footer"><a href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">📚 Kindle 日替わりセール</a></div>',
+        f'<div class="kindle-footer"><a class="kindle-btn" href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">Kindle 日替わりセール</a></div>',
         "",
         SWITCH_JS,
         "",
