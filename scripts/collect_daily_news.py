@@ -104,7 +104,7 @@ POEM_KEYWORDS = [
     "折れない", "後悔しない", "成長するため",
     "してみた", "触ってみた", "考えてみた", "使ってみた", "試してみた",
     "やってみた", "振り返って", "振り返り",
-    "な話", "という話", "った話", "した話",
+    "な話", "という話", "った話", "した話","話","考え","できた"
 ]
 ECO_KEYWORDS  = [
     "経済", "半導体", "nvidia", "tsmc", "テック企業", "産業動向", "規制",
@@ -202,6 +202,7 @@ TAG_LABELS = {
     "pkg":      ("パッケージ",     "tag-pkg"),
     "oss":      ("OSS",          "tag-oss"),
     "dev":      ("開発",         "tag-dev"),
+    "other":    ("その他",       "tag-other"),
 }
 
 
@@ -237,7 +238,7 @@ def classify_tags(title: str, desc: str = "") -> list[str]:
                 tags.append("ai")
         elif any(k in text for k in keywords):
             tags.append(tag_key)
-    return tags or ["dev"]  # 未分類はdevにフォールバック
+    return tags or ["other"]  # 未分類は「その他」
 
 
 def tag_spans(tag_keys: list[str]) -> str:
@@ -634,22 +635,23 @@ def collect_hn() -> list[dict]:
 # --- Markdown ---
 CSS = """<style>
 .tag { font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
-.tag-agent { color: #fff; background: #43a047; }
-.tag-ai    { color: #fff; background: #ef6c00; }
-.tag-ml    { color: #fff; background: #8e24aa; }
-.tag-cv    { color: #fff; background: #1e88e5; }
-.tag-research { color: #fff; background: #3949ab; }
-.tag-sec   { color: #fff; background: #e53935; }
+.tag-agent { color: #fff; background: #66bb6a; }
+.tag-ai    { color: #fff; background: #ffa726; }
+.tag-ml    { color: #fff; background: #ab47bc; }
+.tag-cv    { color: #fff; background: #42a5f5; }
+.tag-research { color: #fff; background: #5c6bc0; }
+.tag-sec   { color: #fff; background: #ef5350; }
 .tag-poem  { color: #fff; background: #ec407a; }
-.tag-eco   { color: #fff; background: #f9a825; }
-.tag-front { color: #fff; background: #00acc1; }
-.tag-back  { color: #fff; background: #8d6e63; }
-.tag-cloud { color: #fff; background: #039be5; }
-.tag-lang  { color: #fff; background: #ab47bc; }
-.tag-git   { color: #fff; background: #546e7a; }
-.tag-pkg   { color: #fff; background: #d81b60; }
-.tag-oss   { color: #fff; background: #7cb342; }
-.tag-dev   { color: #fff; background: #26a69a; }
+.tag-eco   { color: #fff; background: #ffca28; }
+.tag-front { color: #fff; background: #26c6da; }
+.tag-back  { color: #fff; background: #a1887f; }
+.tag-cloud { color: #fff; background: #29b6f6; }
+.tag-lang  { color: #fff; background: #ce93d8; }
+.tag-git   { color: #fff; background: #78909c; }
+.tag-pkg   { color: #fff; background: #f06292; }
+.tag-oss   { color: #fff; background: #9ccc65; }
+.tag-dev   { color: #fff; background: #4db6ac; }
+.tag-other { color: #fff; background: #bdbdbd; }
 .tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .tab-btn { padding: 6px 14px; border: none; border-radius: 20px; cursor: pointer;
   font-size: 0.85rem; font-weight: 700; background: #e8e8e8; color: #444; transition: background 0.15s; }
@@ -662,6 +664,9 @@ CSS = """<style>
 .tab-pane.active { display: block; }
 .item { padding: 8px 0; border-bottom: 1px solid #eee; }
 .item-title { font-size: 0.95rem; font-weight: 600; }
+.item-title a { color: #333 !important; text-decoration: none; }
+.item-title a:visited { color: #333 !important; }
+.item-title a:hover { text-decoration: underline; }
 .item-meta { font-size: 0.78rem; color: #888; margin-top: 2px; }
 details { margin-top: 6px; }
 details summary { cursor: pointer; font-size: 0.82rem; color: #888; margin-top: 4px; }
