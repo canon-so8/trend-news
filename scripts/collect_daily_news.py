@@ -150,7 +150,6 @@ TAG_LABELS = {
     "git":   ("Git",    "tag-git"),
     "pkg":   ("パッケージ", "tag-pkg"),
     "dev":   ("開発",   "tag-dev"),
-    "blog":  ("Blog",   "tag-blog"),
     "other": ("Other",  "tag-other"),
 }
 
@@ -507,11 +506,8 @@ def collect_hatena_blog() -> list[dict]:
             for item in items:
                 if item["url"] not in seen:
                     seen.add(item["url"])
-                    # 興味領域に合う記事のみ（ポエム・AI・ML・Dev）
-                    tag = classify_tag(item["title"], item["desc"])
-                    if tag in ("ai", "ml", "cv", "poem", "dev", "other"):
-                        item["tag"] = "blog"
-                        articles.append(item)
+                    item["tag"] = classify_tag(item["title"], item["desc"])
+                    articles.append(item)
 
     articles.sort(key=lambda a: a["meta"].get("bookmarks", 0), reverse=True)
     return articles[:20]
@@ -576,7 +572,6 @@ CSS = """<style>
 .tag-poem { color: #c2185b; background: #fce4ec; }
 .tag-eco  { color: #00695c; background: #e0f2f1; }
 .tag-dev  { color: #558b2f; background: #f1f8e9; }
-.tag-blog { color: #5c6bc0; background: #e8eaf6; }
 .tag-other { color: #666; background: #f2f2f2; }
 .tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .tab-btn { padding: 6px 14px; border: none; border-radius: 20px; cursor: pointer;
