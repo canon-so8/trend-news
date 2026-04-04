@@ -664,8 +664,7 @@ CSS = """<style>
 .tab-pane.active { display: block; }
 .item { padding: 8px 0; border-bottom: 1px solid #eee; }
 .item-title { font-size: 0.95rem; font-weight: 600; }
-.item-title a { color: #333 !important; text-decoration: none; }
-.item-title a:visited { color: #333 !important; }
+.item-title a, .item-title a:visited { color: #2a7ae2 !important; text-decoration: none; }
 .item-title a:hover { text-decoration: underline; }
 .item-meta { font-size: 0.78rem; color: #888; margin-top: 2px; }
 details { margin-top: 6px; }
