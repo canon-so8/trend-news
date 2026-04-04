@@ -47,13 +47,22 @@ ATOM   = "http://www.w3.org/2005/Atom"
 RDF    = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 HATENA = "http://www.hatena.ne.jp/info/xmlns#"
 
-# --- タグ判定（優先順位: AI > ML > CV > POEM > ECO > DEV > other）---
+# --- タグ判定（優先順位: LLM > AI > ML > CV > POEM > ECO > DEV > DEV(fallback)）---
+LLM_KEYWORDS  = [
+    "claude ", "claude\u300c", "claude\u300d",  # Claude (Anthropic)
+    "gpt-4", "gpt-5", "gpt-4o", "chatgpt", "openai",
+    "gemini ", "gemini-", "bard",
+    "llama", "mistral", "phi-", "qwen", "deepseek",
+    "llm", "大規模言語モデル", "言語モデル",
+    "anthropic", "claude code", "notebooklm",
+    "rag ", "ファインチューニング", "fine-tun", "alignment",
+    "chain-of-thought", "プロンプトエンジニアリング",
+]
 AI_KEYWORDS   = [
-    "llm", "agentic", "gpt-4", "gpt-5", "claude ", "gemini ", "openai",
-    "anthropic", "chatgpt", "生成ai", "大規模言語", "プロンプト", "rag ",
-    "chain-of-thought", "fine-tun", "ファインチューニング", "alignment",
-    "ai agent", "mcp ", "claude code", "人工知能", "生成モデル",
-    "notebooklm", "ai coding", "aiネイティブ", "ai駆動",
+    "生成ai", "ai agent", "agentic", "mcp ", "ai coding", "aiネイティブ", "ai駆動",
+    "人工知能", "生成モデル", "画像生成ai", "動画生成ai",
+    "ai活用", "aiを活用", "aiで", "aiが", "ai搭載", "aiツール",
+    "aiアシスタント", "aiサービス", "ai開発", "ai導入",
 ]
 # copilot/cursor/agentは文脈で分かれるため、AI専用キーワードと組み合わせて判定
 AI_COMBO_KEYWORDS = ["copilot", "cursor ", "agent"]  # 他のAIキーワードと共起でAI判定
@@ -110,33 +119,31 @@ DEV_KEYWORDS  = [
 ]
 
 TAG_LABELS = {
+    "llm":   ("LLM",   "tag-llm"),
     "ai":    ("AI",    "tag-ai"),
     "ml":    ("ML",    "tag-ml"),
     "cv":    ("CV",    "tag-cv"),
     "poem":  ("ポエム", "tag-poem"),
     "eco":   ("経済",  "tag-eco"),
-    "dev":   ("Dev",   "tag-dev"),
+    "dev":   ("開発",  "tag-dev"),
     "blog":  ("Blog",  "tag-blog"),
     "other": ("Other", "tag-other"),
 }
 
 
-# "ai" を単体でマッチ（"api","mail","detail"などへの誤検知を防ぐため正規表現）
-_AI_SOLO_RE = re.compile(r'(?<![a-z])ai(?![a-z])')
-
-
 def classify_tag(title: str, desc: str = "") -> str:
     text = (title + " " + desc).lower()
-    # AI: 直接キーワード or 単体"ai" or コンボキーワード（copilot等+AI文脈）
-    has_ai_direct = any(k in text for k in AI_KEYWORDS) or _AI_SOLO_RE.search(text)
-    has_ai_combo = any(k in text for k in AI_COMBO_KEYWORDS) and has_ai_direct
+    if any(k in text for k in LLM_KEYWORDS):  return "llm"
+    # AI: 直接キーワード or コンボキーワード（copilot等+AI文脈）
+    has_ai_direct = any(k in text for k in AI_KEYWORDS)
+    has_ai_combo  = any(k in text for k in AI_COMBO_KEYWORDS) and has_ai_direct
     if has_ai_direct or has_ai_combo:          return "ai"
     if any(k in text for k in ML_KEYWORDS):   return "ml"
     if any(k in text for k in CV_KEYWORDS):   return "cv"
     if any(k in text for k in POEM_KEYWORDS): return "poem"
     if any(k in text for k in ECO_KEYWORDS):  return "eco"
     if any(k in text for k in DEV_KEYWORDS):  return "dev"
-    return "other"
+    return "dev"  # 技術系メディアなので未分類はdevにフォールバック
 
 
 def tag_span(tag_key: str) -> str:
@@ -532,6 +539,7 @@ def collect_hn() -> list[dict]:
 # --- Markdown ---
 CSS = """<style>
 .tag { font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+.tag-llm  { color: #c45200; background: #fdebd0; }
 .tag-ai   { color: #bf5a00; background: #fff3e0; }
 .tag-ml   { color: #6a1b9a; background: #f3e5f5; }
 .tag-cv   { color: #1a6bbf; background: #e8f0fb; }
