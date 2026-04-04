@@ -4,6 +4,7 @@ Kindle 日替わりセール本 収集スクリプト
 sale-bon.com/daily_sale/ から個別書籍を取得し、
 yapi.ta2o.net/kndlsl/ からセールキャンペーン一覧を補足してJekyll Markdownを生成
 """
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -116,8 +117,8 @@ def fetch_sale_bon_books() -> list[dict]:
                 img_url = img_el.get("src", "")
                 if img_url.startswith("//"):
                     img_url = "https:" + img_url
-                # _SL160_ → _SL200_ で少し大きく
-                img_url = img_url.replace("_SL160_", "_SL200_")
+                # _SL160_ → _SL500_ で高解像度化
+                img_url = re.sub(r'_SL\d+_', '_SL500_', img_url)
 
             books.append({
                 "title": title,
