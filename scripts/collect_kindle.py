@@ -21,7 +21,7 @@ OUTPUT_DIR = REPO_ROOT / "_posts" / "kindle"
 SALE_BON_URL = "https://sale-bon.com/daily_sale/"
 
 CSS = """<style>
-.kindle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin: 1.2rem 0; }
+.kindle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin: 1.2rem 0; }
 .kindle-card { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: box-shadow .2s; }
 .kindle-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
 .kindle-card a { text-decoration: none; color: inherit; display: block; }
