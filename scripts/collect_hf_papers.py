@@ -10,6 +10,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 
 import requests
@@ -145,7 +146,7 @@ def _make_session() -> requests.Session:
     retry = Retry(total=3, backoff_factor=1.5, status_forcelist=[429, 500, 502, 503, 504])
     session.mount("https://", HTTPAdapter(max_retries=retry))
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        "User-Agent": "news-claw/1.0 (+https://github.com/canon-so8/news-claw)",
         "Accept": "application/json",
     })
     return session
@@ -270,15 +271,17 @@ def main():
             f' <span class="tag tag-hf">★ {p["github_stars"]} stars</span>'
             if p["github_stars"] > 0 else ""
         )
-        arxiv_url = f'https://arxiv.org/abs/{p["id"]}'
+        arxiv_url = f'https://arxiv.org/abs/{escape(p["id"])}'
         hf_date = p.get("hf_date", "")
-        summary_ja = p.get("summary_ja", "")
-        github_link_html = f' · <a href="{p["github_repo"]}">GitHub</a>' if p["github_repo"] else ""
+        summary_ja = escape(p.get("summary_ja", ""))
+        title_esc = escape(p["title"])
+        author_esc = escape(p["first_author"])
+        github_link_html = f' · <a href="{escape(p["github_repo"], quote=True)}">GitHub</a>' if p["github_repo"] else ""
 
         detail_lines = [
             f'<div class="paper" data-tags="{data_tags}">',
-            f'<p><strong><a href="{arxiv_url}">{p["title"]}</a></strong></p>',
-            f'<p>{tag_spans} {upvote_span}{star_span} · {hf_date[5:]} · {p["first_author"]}{github_link_html}</p>',
+            f'<p><strong><a href="{arxiv_url}">{title_esc}</a></strong></p>',
+            f'<p>{tag_spans} {upvote_span}{star_span} · {hf_date[5:]} · {author_esc}{github_link_html}</p>',
         ]
         if summary_ja:
             detail_lines += [

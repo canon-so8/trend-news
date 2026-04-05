@@ -17,11 +17,12 @@ import re
 import sys
 import time
 import urllib.parse
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -253,12 +254,27 @@ def tag_spans(tag_keys: list[str]) -> str:
 # --- HTTP セッション ---
 QIITA_TOKEN = os.environ.get("QIITA_TOKEN", "")
 
+ALLOWED_DOMAINS = {
+    "qiita.com", "zenn.dev", "b.hatena.ne.jp",
+    "hn.algolia.com", "news.ycombinator.com",
+    "api-free.deepl.com", "api.deepl.com",
+}
+
+
+def is_allowed_url(url: str) -> bool:
+    """URLのドメインがホワイトリストに含まれるか検証"""
+    try:
+        hostname = urlparse(url).hostname or ""
+        return any(hostname == d or hostname.endswith("." + d) for d in ALLOWED_DOMAINS)
+    except Exception:
+        return False
+
 
 def _session() -> requests.Session:
     s = requests.Session()
     retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
     s.mount("https://", HTTPAdapter(max_retries=retry))
-    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "news-claw/1.0 (+https://github.com/canon-so8/news-claw)"}
     if QIITA_TOKEN:
         headers["Authorization"] = f"Bearer {QIITA_TOKEN}"
     s.headers.update(headers)
@@ -481,10 +497,14 @@ def collect_qiita() -> list[dict]:
 
     # トレンド記事のlikes_countをAPI経由で補完
     for a in trend_articles:
+        if not is_allowed_url(a["url"]):
+            continue
         # URLからitem_idを抽出: https://qiita.com/user/items/XXXXX → XXXXX
         parts = a["url"].rstrip("/").split("/")
         if len(parts) >= 2 and parts[-2] == "items":
             item_id = parts[-1]
+            if not re.fullmatch(r'[a-zA-Z0-9_-]+', item_id):
+                continue
             r2 = get(f"https://qiita.com/api/v2/items/{item_id}")
             if r2:
                 data = r2.json()
