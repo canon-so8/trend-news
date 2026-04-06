@@ -2,7 +2,7 @@ name: Collect Trends
 
 on:
   schedule:
-    - cron: "0 2 * * 1-5"  # 平日 11:00 JST スタート → 遅延込みで12:00〜13:00着予定
+    - cron: "*/5 * * * *"  # テスト: 5分毎（元: 0 2 * * 1-5 平日11:00 JST）
   workflow_dispatch:  # 手動実行も可
 
 permissions:
