@@ -765,7 +765,9 @@ function switchTab(id, btn) {
   const pane = document.getElementById('tab-' + id);
   pane.classList.add('active');
   btn.classList.add('active');
-  sortPane(pane, _sort);
+  const sortBar = document.querySelector('.sort-bar');
+  if (id === 'slides') { sortBar.style.display = 'none'; }
+  else { sortBar.style.display = ''; sortPane(pane, _sort); }
 }
 </script>"""
 
