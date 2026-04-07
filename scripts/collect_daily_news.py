@@ -258,6 +258,7 @@ ALLOWED_DOMAINS = {
     "qiita.com", "zenn.dev", "b.hatena.ne.jp",
     "hn.algolia.com", "news.ycombinator.com",
     "api-free.deepl.com", "api.deepl.com",
+    "yuji.software",
 }
 
 
@@ -651,6 +652,35 @@ def collect_hn() -> list[dict]:
     return articles
 
 
+def collect_slides() -> list[dict]:
+    """勉強会スライドbot: JSON Feed からスライド情報を収集"""
+    url = "https://yuji.software/tech_slideshare/feed.json"
+    r = get(url)
+    if not r:
+        return []
+    articles = []
+    seen: set[str] = set()
+    for item in r.json().get("items", []):
+        title = item.get("title", "")
+        link = item.get("link", "")
+        if not title or not link or link in seen:
+            continue
+        seen.add(link)
+        author = item.get("author") or ""
+        date = _parse_date(item.get("date") or "")
+        desc = item.get("description") or ""
+        articles.append({
+            "title": title,
+            "url": link,
+            "date": date,
+            "desc": desc,
+            "tags": classify_tags(title, desc),
+            "meta": {
+                "author": author,
+            },
+        })
+    return articles
+
 
 # --- Markdown ---
 CSS = """<style>
@@ -702,6 +732,7 @@ TAB_NAV = """<div class="tab-nav">
   <button class="tab-btn" onclick="switchTab('hatena',this)">はてな</button>
   <button class="tab-btn" onclick="switchTab('blog',this)">Blog</button>
   <button class="tab-btn" onclick="switchTab('hn',this)">HN</button>
+  <button class="tab-btn" onclick="switchTab('slides',this)">Slides</button>
 </div>
 <div class="sort-bar">
   <button class="sort-btn active" onclick="setSort('latest',this)">Latest</button>
@@ -824,21 +855,24 @@ def main():
 
     print("収集開始...")
 
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=6) as ex:
         f_zenn   = ex.submit(collect_zenn)
         f_qiita  = ex.submit(collect_qiita)
         f_hatena = ex.submit(collect_hatena)
         f_blog   = ex.submit(collect_hatena_blog)
         f_hn     = ex.submit(collect_hn)
+        f_slides = ex.submit(collect_slides)
 
     zenn_articles   = f_zenn.result()
     qiita_articles  = f_qiita.result()
     hatena_articles = f_hatena.result()
     blog_articles   = f_blog.result()
     hn_articles     = f_hn.result()
+    slides_articles = f_slides.result()
 
     print(f"  Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, HN: {len(hn_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, "
+          f"HN: {len(hn_articles)}, Slides: {len(slides_articles)}")
 
     # --- 日付フィルタ（Zennはトレンドなのでフィルタなし、他は14日）---
     cutoff = (now - timedelta(days=14)).strftime("%Y-%m-%d")
@@ -848,9 +882,10 @@ def main():
     # Zennはorder=weeklyでその日のトレンド取得済みなのでフィルタ不要
     qiita_articles  = recent(qiita_articles)
     hatena_articles = recent(hatena_articles)
+    slides_articles = recent(slides_articles)
     # blogは1ヶ月の検索RSSなのでフィルタ不要
     print(f"  日付フィルタ後 → Zenn: {len(zenn_articles)}(フィルタなし), Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, Slides: {len(slides_articles)}")
 
     # --- タブ間の重複排除（先のタブを優先、UTMパラメータ除去して比較）---
     global_seen: set[str] = set()
@@ -867,8 +902,10 @@ def main():
     hatena_articles = dedup(hatena_articles)
     blog_articles   = dedup(blog_articles)
     hn_articles     = dedup(hn_articles)
+    slides_articles = dedup(slides_articles)
     print(f"  重複排除後 → Zenn: {len(zenn_articles)}, Qiita: {len(qiita_articles)}, "
-          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, HN: {len(hn_articles)}")
+          f"はてな: {len(hatena_articles)}, Blog: {len(blog_articles)}, "
+          f"HN: {len(hn_articles)}, Slides: {len(slides_articles)}")
 
     lines: list[str] = [
         "---",
@@ -893,6 +930,8 @@ def main():
     lines += render_standard(blog_articles,   "blog",  "🔖", "bookmarks")
     lines += [""]
     lines += render_hn(hn_articles)
+    lines += [""]
+    lines += render_standard(slides_articles, "slides", "", "")
     lines += [
         "",
         f'<div class="kindle-footer"><a class="kindle-btn" href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">Kindle 日替わりセール</a></div>',
