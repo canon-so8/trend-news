@@ -765,7 +765,7 @@ TAB_NAV = """<div class="tab-nav">
   <button class="tab-btn" onclick="switchTab('blog',this)">Blog</button>
   <button class="tab-btn" onclick="switchTab('hn',this)">HN</button>
   <button class="tab-btn" onclick="switchTab('slides',this)">Slides</button>
-  <button class="tab-btn" onclick="switchTab('ghtrend',this)">GH Trending</button>
+  <button class="tab-btn" onclick="switchTab('ghtrend',this)">Github</button>
 </div>
 <div class="sort-bar">
   <button class="sort-btn active" onclick="setSort('latest',this)">Latest</button>
