@@ -655,7 +655,9 @@ def collect_hn() -> list[dict]:
 
 
 def collect_slides() -> list[dict]:
-    """勉強会スライドbot: JSON Feed からスライド情報を収集"""
+    """勉強会スライドbot: JSON Feed からスライド情報を収集
+    データソース: https://github.com/YujiSoftware/tech_slideshare
+    """
     url = "https://yuji.software/tech_slideshare/feed.json"
     r = get(url)
     if not r:
@@ -685,7 +687,10 @@ def collect_slides() -> list[dict]:
 
 
 def collect_github_trending() -> list[dict]:
-    """GitHub Trending 日本語まとめ: RSS Feed からトレンドリポジトリを収集"""
+    """GitHub Trending 日本語まとめ: RSS Feed からトレンドリポジトリを収集
+    データソース: https://github.com/yashikota/github-trending-ja
+    Copyright (c) 2025 kota - MIT License
+    """
     url = "https://yashikota.github.io/github-trending-ja/feed.xml"
     r = get(url)
     if not r:
