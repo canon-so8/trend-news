@@ -784,8 +784,8 @@ TAB_NAV = """<div class="tab-nav">
   <button class="tab-btn" onclick="switchTab('ghtrend',this)">Github</button>
 </div>
 <div class="sort-bar">
-  <button class="sort-btn active" onclick="setSort('latest',this)">Latest</button>
-  <button class="sort-btn" onclick="setSort('hotness',this)">Hotness</button>
+  <button id="sort-latest" class="sort-btn active" onclick="setSort('latest',this)">Latest</button>
+  <button id="sort-hotness" class="sort-btn" onclick="setSort('hotness',this)">Hotness</button>
 </div>"""
 
 SWITCH_JS = """<script>
@@ -815,8 +815,21 @@ function switchTab(id, btn) {
   pane.classList.add('active');
   btn.classList.add('active');
   const sortBar = document.querySelector('.sort-bar');
-  if (id === 'slides' || id === 'ghtrend') { sortBar.style.display = 'none'; }
-  else { sortBar.style.display = ''; sortPane(pane, _sort); }
+  const btnL = document.getElementById('sort-latest');
+  const btnH = document.getElementById('sort-hotness');
+  if (id === 'slides') {
+    sortBar.style.display = '';
+    btnL.style.display = ''; btnH.style.display = 'none';
+    setSort('latest', btnL);
+  } else if (id === 'ghtrend') {
+    sortBar.style.display = '';
+    btnL.style.display = 'none'; btnH.style.display = '';
+    setSort('hotness', btnH);
+  } else {
+    sortBar.style.display = '';
+    btnL.style.display = ''; btnH.style.display = '';
+    sortPane(pane, _sort);
+  }
 }
 </script>"""
 
@@ -843,7 +856,7 @@ def safe_href(url: str) -> str:
 
 
 def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_key: str,
-                    source_url: str = "") -> list[str]:
+                    source_url: str = "", source_credit: str = "") -> list[str]:
     active = " active" if tab_id == "zenn" else ""
     # デフォルト: 最新順
     sorted_articles = sorted(articles, key=lambda a: a.get("date", ""), reverse=True)
@@ -865,7 +878,11 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
             "</div>",
         ]
     if source_url:
-        lines.append(f'<div class="item-meta" style="margin-top:12px;">引用: <a href="{safe_href(source_url)}" target="_blank" rel="noopener">{esc(source_url)}</a></div>')
+        credit_line = f'<div class="item-meta" style="margin-top:12px;">引用: <a href="{safe_href(source_url)}" target="_blank" rel="noopener">{esc(source_url)}</a>'
+        if source_credit:
+            credit_line += f'<br>{esc(source_credit)}'
+        credit_line += '</div>'
+        lines.append(credit_line)
     lines.append("</div>")
     return lines
 
@@ -901,7 +918,7 @@ def render_hn(articles: list[dict]) -> list[str]:
     return lines
 
 
-def render_ghtrend(articles: list[dict], source_url: str = "") -> list[str]:
+def render_ghtrend(articles: list[dict], source_url: str = "", source_credit: str = "") -> list[str]:
     """GitHub Trending専用レンダラー: リポ名リンク + 説明文 + スター数 + 言語"""
     lines = ['<div id="tab-ghtrend" class="tab-pane">']
     for a in articles:
@@ -925,7 +942,11 @@ def render_ghtrend(articles: list[dict], source_url: str = "") -> list[str]:
             "</div>",
         ]
     if source_url:
-        lines.append(f'<div class="item-meta" style="margin-top:12px;">引用: <a href="{safe_href(source_url)}" target="_blank" rel="noopener">{esc(source_url)}</a></div>')
+        credit_line = f'<div class="item-meta" style="margin-top:12px;">引用: <a href="{safe_href(source_url)}" target="_blank" rel="noopener">{esc(source_url)}</a>'
+        if source_credit:
+            credit_line += f'<br>{esc(source_credit)}'
+        credit_line += '</div>'
+        lines.append(credit_line)
     lines.append("</div>")
     return lines
 
@@ -1022,10 +1043,12 @@ def main():
     lines += render_hn(hn_articles)
     lines += [""]
     lines += render_standard(slides_articles, "slides", "", "",
-                             source_url="https://yuji.software/tech_slideshare/")
+                             source_url="https://yuji.software/tech_slideshare/",
+                             source_credit="by YujiSoftware/tech_slideshare")
     lines += [""]
     lines += render_ghtrend(ghtrend_articles,
-                            source_url="https://github-trending-ja.yashikota.com/")
+                            source_url="https://github-trending-ja.yashikota.com/",
+                            source_credit="Copyright (c) 2025 kota - MIT License")
     lines += [
         "",
         f'<div class="kindle-footer"><a class="kindle-btn" href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">Kindle 日替わりセール</a></div>',
