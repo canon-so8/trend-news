@@ -1039,11 +1039,11 @@ def main():
     lines += [
         "",
         '<div id="credit-slides" class="item-meta" style="margin-top:12px;display:none;">',
-        'Slides: <a href="https://yuji.software/tech_slideshare/" target="_blank" rel="noopener">勉強会スライドbot</a>'
+        '引用: <a href="https://yuji.software/tech_slideshare/" target="_blank" rel="noopener">勉強会スライドbot</a>'
         ' by <a href="https://github.com/YujiSoftware" target="_blank" rel="noopener">YujiSoftware</a>',
         '</div>',
         '<div id="credit-ghtrend" class="item-meta" style="margin-top:12px;display:none;">',
-        'Github: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">GitHub Trending 日本語まとめ</a>'
+        '引用: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">GitHub Trending 日本語まとめ</a>'
         ' by <a href="https://github.com/yashikota/github-trending-ja" target="_blank" rel="noopener">kota</a> (MIT License)',
         '</div>',
         "",
