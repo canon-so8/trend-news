@@ -817,6 +817,10 @@ function switchTab(id, btn) {
   const sortBar = document.querySelector('.sort-bar');
   const btnL = document.getElementById('sort-latest');
   const btnH = document.getElementById('sort-hotness');
+  const crS = document.getElementById('credit-slides');
+  const crG = document.getElementById('credit-ghtrend');
+  crS.style.display = id === 'slides' ? '' : 'none';
+  crG.style.display = id === 'ghtrend' ? '' : 'none';
   if (id === 'slides') {
     sortBar.style.display = '';
     btnL.style.display = ''; btnH.style.display = 'none';
@@ -1034,10 +1038,12 @@ def main():
     lines += render_ghtrend(ghtrend_articles)
     lines += [
         "",
-        '<div class="item-meta" style="margin-top:12px;">',
+        '<div id="credit-slides" class="item-meta" style="margin-top:12px;display:none;">',
         'Slides: <a href="https://yuji.software/tech_slideshare/" target="_blank" rel="noopener">勉強会スライドbot</a>'
         ' by <a href="https://github.com/YujiSoftware" target="_blank" rel="noopener">YujiSoftware</a>',
-        '<br>Github: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">GitHub Trending 日本語まとめ</a>'
+        '</div>',
+        '<div id="credit-ghtrend" class="item-meta" style="margin-top:12px;display:none;">',
+        'Github: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">GitHub Trending 日本語まとめ</a>'
         ' by <a href="https://github.com/yashikota/github-trending-ja" target="_blank" rel="noopener">kota</a> (MIT License)',
         '</div>',
         "",
