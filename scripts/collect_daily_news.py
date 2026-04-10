@@ -855,8 +855,7 @@ def safe_href(url: str) -> str:
     return esc(url)
 
 
-def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_key: str,
-                    source_url: str = "", source_credit: str = "") -> list[str]:
+def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_key: str) -> list[str]:
     active = " active" if tab_id == "zenn" else ""
     # デフォルト: 最新順
     sorted_articles = sorted(articles, key=lambda a: a.get("date", ""), reverse=True)
@@ -877,12 +876,6 @@ def render_standard(articles: list[dict], tab_id: str, count_icon: str, count_ke
             f'  <div class="item-meta">{" &nbsp; ".join(meta_parts)}</div>',
             "</div>",
         ]
-    if source_url:
-        credit_line = f'<div class="item-meta" style="margin-top:12px;">引用: <a href="{safe_href(source_url)}" target="_blank" rel="noopener">{esc(source_url)}</a>'
-        if source_credit:
-            credit_line += f'<br>{esc(source_credit)}'
-        credit_line += '</div>'
-        lines.append(credit_line)
     lines.append("</div>")
     return lines
 
@@ -918,7 +911,7 @@ def render_hn(articles: list[dict]) -> list[str]:
     return lines
 
 
-def render_ghtrend(articles: list[dict], source_url: str = "", source_credit: str = "") -> list[str]:
+def render_ghtrend(articles: list[dict]) -> list[str]:
     """GitHub Trending専用レンダラー: リポ名リンク + 説明文 + スター数 + 言語"""
     lines = ['<div id="tab-ghtrend" class="tab-pane">']
     for a in articles:
@@ -936,17 +929,11 @@ def render_ghtrend(articles: list[dict], source_url: str = "", source_credit: st
             f'  <div class="item-title"><a href="{url}">{repo}</a></div>',
         ]
         if desc:
-            lines.append(f'  <div class="item-meta">{desc}</div>')
+            lines.append(f'  <div class="item-meta" style="color:#333;">{desc}</div>')
         lines += [
             f'  <div class="item-meta">{" &nbsp; ".join(meta_parts)}</div>',
             "</div>",
         ]
-    if source_url:
-        credit_line = f'<div class="item-meta" style="margin-top:12px;">引用: <a href="{safe_href(source_url)}" target="_blank" rel="noopener">{esc(source_url)}</a>'
-        if source_credit:
-            credit_line += f'<br>{esc(source_credit)}'
-        credit_line += '</div>'
-        lines.append(credit_line)
     lines.append("</div>")
     return lines
 
@@ -1042,14 +1029,17 @@ def main():
     lines += [""]
     lines += render_hn(hn_articles)
     lines += [""]
-    lines += render_standard(slides_articles, "slides", "", "",
-                             source_url="https://yuji.software/tech_slideshare/",
-                             source_credit="by YujiSoftware/tech_slideshare")
+    lines += render_standard(slides_articles, "slides", "", "")
     lines += [""]
-    lines += render_ghtrend(ghtrend_articles,
-                            source_url="https://github-trending-ja.yashikota.com/",
-                            source_credit="Copyright (c) 2025 kota - MIT License")
+    lines += render_ghtrend(ghtrend_articles)
     lines += [
+        "",
+        '<div class="item-meta" style="margin-top:12px;">',
+        '引用: <a href="https://yuji.software/tech_slideshare/" target="_blank" rel="noopener">Slides - 勉強会スライドbot</a>'
+        ' (<a href="https://github.com/YujiSoftware/tech_slideshare" target="_blank" rel="noopener">YujiSoftware/tech_slideshare</a>)',
+        '<br>引用: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">Github - GitHub Trending 日本語まとめ</a>'
+        ' — Copyright (c) 2025 kota - MIT License',
+        '</div>',
         "",
         f'<div class="kindle-footer"><a class="kindle-btn" href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">Kindle 日替わりセール</a></div>',
         "",
