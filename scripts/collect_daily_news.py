@@ -929,7 +929,7 @@ def render_ghtrend(articles: list[dict]) -> list[str]:
             f'  <div class="item-title"><a href="{url}">{repo}</a></div>',
         ]
         if desc:
-            lines.append(f'  <div class="item-meta" style="color:#333;">{desc}</div>')
+            lines.append(f'  <div class="item-meta" style="color:#333;font-size:0.88rem;">{desc}</div>')
         lines += [
             f'  <div class="item-meta">{" &nbsp; ".join(meta_parts)}</div>',
             "</div>",
@@ -1035,10 +1035,10 @@ def main():
     lines += [
         "",
         '<div class="item-meta" style="margin-top:12px;">',
-        '引用: <a href="https://yuji.software/tech_slideshare/" target="_blank" rel="noopener">Slides - 勉強会スライドbot</a>'
-        ' (<a href="https://github.com/YujiSoftware/tech_slideshare" target="_blank" rel="noopener">YujiSoftware/tech_slideshare</a>)',
-        '<br>引用: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">Github - GitHub Trending 日本語まとめ</a>'
-        ' — Copyright (c) 2025 kota - MIT License',
+        'Slides: <a href="https://yuji.software/tech_slideshare/" target="_blank" rel="noopener">勉強会スライドbot</a>'
+        ' by <a href="https://github.com/YujiSoftware" target="_blank" rel="noopener">YujiSoftware</a>',
+        '<br>Github: <a href="https://github-trending-ja.yashikota.com/" target="_blank" rel="noopener">GitHub Trending 日本語まとめ</a>'
+        ' by <a href="https://github.com/yashikota/github-trending-ja" target="_blank" rel="noopener">kota</a> (MIT License)',
         '</div>',
         "",
         f'<div class="kindle-footer"><a class="kindle-btn" href="{KINDLE_DAILY_URL}" target="_blank" rel="noopener">Kindle 日替わりセール</a></div>',
